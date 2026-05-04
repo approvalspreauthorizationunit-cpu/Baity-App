@@ -68,14 +68,29 @@ Stored in .env.local (never hardcoded)
 | 2026-05-04 | SellerPendingScreen for pending/needs_info sellers | ✅ Done |
 | 2026-05-04 | Health certificate expiry alert in SellerDashboard | ✅ Done |
 | 2026-05-04 | Navigation updated for seller status routing | ✅ Done |
+| 2026-05-04 | Admin Dashboard rebuilt with Supabase integration | ✅ Done |
+| 2026-05-04 | Seller application review (approve/reject/needs_info) | ✅ Done |
+| 2026-05-04 | Commission management per seller | ✅ Done |
+| 2026-05-04 | Platform settings management (commission, delivery, min withdrawal) | ✅ Done |
+| 2026-05-04 | Regions management (add/edit/toggle active) | ✅ Done |
+| 2026-05-04 | Withdrawal requests management with Edge Function | ✅ Done |
+| 2026-05-04 | Order monitoring tab in Admin Dashboard | ✅ Done |
+| 2026-05-04 | Admin routing via role-based navigation guards | ✅ Done |
+| 2026-05-04 | Fixed RLS errors using correct Service Role | ✅ Done |
+| 2026-05-04 | Fixed platform crash (div replaced with View) | ✅ Done |
+
+| 2026-05-04 | CheckoutScreen connected to Supabase with Edge Function for totals | ✅ Done |
+| 2026-05-04 | Real order creation with order_items in Supabase | ✅ Done |
+| 2026-05-04 | OrderTrackingScreen — removed mock timer, connected to Realtime | ✅ Done |
+| 2026-05-04 | Post-delivery rating system implemented | ✅ Done |
+| 2026-05-04 | SellerOrdersScreen — order status updates trigger Edge Function | ✅ Done |
+| 2026-05-04 | SellerWalletScreen — real wallet data, transactions, withdrawal flow | ✅ Done |
 
 ## Pending Tasks
-- Admin panel: review seller applications + approve/reject/needs_info
-- CheckoutScreen — real order placement with Edge Functions
-- OrderTrackingScreen — Supabase Realtime
-- Admin Dashboard — full Supabase integration
-- Wallet + Withdrawal — Edge Functions
-- Special Requests — bidding feature
+- Special Requests (bidding feature) — full flow
+- Push notifications for new orders (future)
+- Ratings display on seller profile
+- Performance optimization and error boundary setup
 
 ## Business Rules
 - Platform commission: 10% default (configurable per seller)

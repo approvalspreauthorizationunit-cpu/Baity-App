@@ -465,17 +465,34 @@ function StatCard({ icon, label, value, color, wide }) {
 
 function DocumentImage({ label, path, userId }) {
   const [url, setUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
     if (path) {
-      const { data } = supabase.storage.from('seller-documents').getPublicUrl(path);
-      if (data) setUrl(data.publicUrl);
+      getSignedUrl();
     }
   }, [path]);
+
+  const getSignedUrl = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.storage
+      .from('seller-documents')
+      .createSignedUrl(path, 3600);
+
+    if (data) setUrl(data.signedUrl);
+    setLoading(false);
+  };
 
   return (
     <View style={styles.docContainer}>
       <Text style={styles.docLabel}>{label}</Text>
-      {url ? <Image source={{ uri: url }} style={styles.docImage} resizeMode="contain" /> : <Text>لا توجد صورة</Text>}
+      {loading ? (
+        <ActivityIndicator size="small" color={colors.primary} />
+      ) : url ? (
+        <Image source={{ uri: url }} style={styles.docImage} resizeMode="contain" />
+      ) : (
+        <Text>لا توجد صورة</Text>
+      )}
     </View>
   );
 }

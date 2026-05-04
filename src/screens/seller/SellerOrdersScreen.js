@@ -108,6 +108,15 @@ export default function SellerOrdersScreen() {
         .eq('id', orderId);
 
       if (error) throw error;
+
+      if (status === 'delivered') {
+        const { error: funcError } = await supabase.functions.invoke(
+          'process-order-completion',
+          { body: { order_id: orderId } }
+        );
+        if (funcError) console.error('Error processing order completion:', funcError);
+      }
+
       // Realtime listener will handle the local state update
     } catch (err) {
       Alert.alert('خطأ', 'تعذر تحديث حالة الطلب');

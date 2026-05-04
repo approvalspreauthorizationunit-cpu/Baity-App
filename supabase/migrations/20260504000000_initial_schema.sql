@@ -36,6 +36,7 @@ create table seller_profiles (
   commission_rate numeric default 10,
   region_id uuid references regions(id),
   wallet_balance numeric default 0,
+  is_available boolean default true,
   created_at timestamptz default now()
 );
 
