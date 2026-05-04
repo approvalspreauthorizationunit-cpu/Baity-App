@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  StatusBar, KeyboardAvoidingView, Platform, Alert
+  StatusBar, KeyboardAvoidingView, Platform, Alert, ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
+import { useApp } from '../../context/AppContext';
 
 export default function AdminLoginScreen({ navigation }) {
+  const { login } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -39,7 +41,7 @@ export default function AdminLoginScreen({ navigation }) {
         // Verify admin role
         const { data: profile, error: profileError } = await supabase
           .from('users')
-          .select('role')
+          .select('*')
           .eq('id', data.user.id)
           .single();
 
@@ -50,6 +52,7 @@ export default function AdminLoginScreen({ navigation }) {
           return;
         }
 
+        await login({ ...profile, mode: 'admin' });
         navigation.replace('AdminDashboard');
       }
     } catch (err) {
@@ -127,9 +130,9 @@ export default function AdminLoginScreen({ navigation }) {
             disabled={loading}
             activeOpacity={0.85}
           >
-            <Text style={styles.buttonText}>
-              {loading ? 'جاري التحقق...' : 'دخول'}
-            </Text>
+            {loading ? <ActivityIndicator color="#fff" /> : (
+              <Text style={styles.buttonText}>دخول</Text>
+            )}
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -237,6 +240,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 10,
     elevation: 6,
+    minHeight: 56,
+    justifyContent: 'center'
   },
   buttonDisabled: {
     backgroundColor: '#555',

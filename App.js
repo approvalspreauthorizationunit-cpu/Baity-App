@@ -18,6 +18,10 @@ import OTPScreen from './src/screens/auth/OTPScreen';
 import RoleSelectionScreen from './src/screens/auth/RoleSelectionScreen';
 import SellerRegistrationScreen from './src/screens/auth/SellerRegistrationScreen';
 
+// Admin Screens
+import AdminLoginScreen from './src/screens/admin/AdminLoginScreen';
+import AdminDashboardScreen from './src/screens/admin/AdminDashboardScreen';
+
 // Customer Screens
 import CustomerHomeScreen from './src/screens/customer/CustomerHomeScreen';
 import SellerProfileScreen from './src/screens/customer/SellerProfileScreen';
@@ -178,6 +182,14 @@ function AppNavigator() {
     );
   }
 
+  if (user?.role === 'admin') {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+      </Stack.Navigator>
+    );
+  }
+
   if (user?.role === 'seller') {
     if (user.sellerStatus === 'approved') {
       return (
@@ -199,8 +211,6 @@ function AppNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="CustomerRoot"   component={CustomerRoot} />
-      <Stack.Screen name="AdminLogin"     component={AdminLoginScreen} />
-      <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
     </Stack.Navigator>
   );
 }
