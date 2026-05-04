@@ -90,7 +90,6 @@ Stored in .env.local (never hardcoded)
 | 2026-05-05 | Seller average rating displayed dynamically across the app | ✅ Done |
 | 2026-05-05 | Detailed reviews section added to SellerProfileScreen | ✅ Done |
 | 2026-05-05 | Special Requests tabs added to navigation for both roles | ✅ Done |
-
 | 2026-05-05 | ErrorBoundary component added | ✅ Done |
 | 2026-05-05 | LoadingScreen global component added | ✅ Done |
 | 2026-05-05 | EmptyState component added to all relevant screens | ✅ Done |
