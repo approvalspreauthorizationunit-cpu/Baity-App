@@ -53,11 +53,11 @@ export default function RoleSelectionScreen({ navigation, route }) {
       }
 
       // 3. Update App Context
-      await login(newProfile);
+      await login({ ...newProfile, sellerStatus: role === 'seller' ? 'pending' : null });
 
       // 4. Navigation
       if (role === 'seller') {
-        navigation.navigate('SellerSetup');
+        navigation.replace('SellerRegistration');
       } else {
         navigation.navigate('CustomerRoot');
       }
@@ -236,6 +236,7 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: 6,
   },
+  cardFeaturesSelected: {},
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',

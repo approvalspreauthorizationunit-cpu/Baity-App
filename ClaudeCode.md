@@ -63,14 +63,19 @@ Stored in .env.local (never hardcoded)
 | 2026-05-04 | OrderHistoryScreen connected to Supabase | ✅ Done |
 | 2026-05-04 | SellerOrdersScreen connected to Supabase + Realtime | ✅ Done |
 | 2026-05-04 | SellerDashboardScreen connected to Supabase | ✅ Done |
+| 2026-05-04 | Seller registration flow with multi-step form | ✅ Done |
+| 2026-05-04 | Document upload to Supabase Storage (seller-documents bucket) | ✅ Done |
+| 2026-05-04 | SellerPendingScreen for pending/needs_info sellers | ✅ Done |
+| 2026-05-04 | Health certificate expiry alert in SellerDashboard | ✅ Done |
+| 2026-05-04 | Navigation updated for seller status routing | ✅ Done |
 
 ## Pending Tasks
-- Build seller registration flow with document upload
-- Connect order placement to Supabase (CheckoutScreen)
-- Connect order tracking to Supabase Realtime (OrderTrackingScreen)
-- Build admin dashboard with Supabase integration
-- Connect wallet and withdrawal system to Edge Functions
-- Build special requests (bidding) feature
+- Admin panel: review seller applications + approve/reject/needs_info
+- CheckoutScreen — real order placement with Edge Functions
+- OrderTrackingScreen — Supabase Realtime
+- Admin Dashboard — full Supabase integration
+- Wallet + Withdrawal — Edge Functions
+- Special Requests — bidding feature
 
 ## Business Rules
 - Platform commission: 10% default (configurable per seller)
@@ -84,5 +89,6 @@ Stored in .env.local (never hardcoded)
 ## Notes & Decisions
 - **Supabase Auth**: Implemented international phone number formatting (+20) for SMS OTP.
 - **Data Integration**: Successfully replaced all major mock data flows with real-time Supabase queries.
-- **Unique Constraints**: Added unique constraints to `regions(name)` and `products(name, seller_id)` via migration to facilitate upsert operations in seeding scripts.
-- **Realtime**: Leveraged Supabase Realtime for order status updates in the seller's workflow.
+- **Seller Registration**: Implemented a 3-step registration flow including document upload to Supabase Storage.
+- **Routing**: Added logic in `AppNavigator` and `AppContext` to route sellers to `SellerPendingScreen` if their application is not yet approved.
+- **Notifications**: Added a health certificate expiry banner in the Seller Dashboard to alert users 30 days before expiration.

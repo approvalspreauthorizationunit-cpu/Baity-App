@@ -16,6 +16,7 @@ import SplashScreen from './src/screens/auth/SplashScreen';
 import PhoneScreen from './src/screens/auth/PhoneScreen';
 import OTPScreen from './src/screens/auth/OTPScreen';
 import RoleSelectionScreen from './src/screens/auth/RoleSelectionScreen';
+import SellerRegistrationScreen from './src/screens/auth/SellerRegistrationScreen';
 
 // Customer Screens
 import CustomerHomeScreen from './src/screens/customer/CustomerHomeScreen';
@@ -33,10 +34,7 @@ import SellerProductsScreen from './src/screens/seller/SellerProductsScreen';
 import AddProductScreen from './src/screens/seller/AddProductScreen';
 import SellerWalletScreen from './src/screens/seller/SellerWalletScreen';
 import SellerSetupScreen from './src/screens/seller/SellerSetupScreen';
-
-// Admin Screens
-import AdminLoginScreen from './src/screens/admin/AdminLoginScreen';
-import AdminDashboardScreen from './src/screens/admin/AdminDashboardScreen';
+import SellerPendingScreen from './src/screens/seller/SellerPendingScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -169,22 +167,33 @@ function AppNavigator() {
   if (!isLoggedIn) {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Splash"         component={SplashScreen} />
-        <Stack.Screen name="Phone"          component={PhoneScreen} />
-        <Stack.Screen name="OTP"            component={OTPScreen} />
-        <Stack.Screen name="RoleSelection"  component={RoleSelectionScreen} />
-        <Stack.Screen name="AdminLogin"     component={AdminLoginScreen} />
-        <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+        <Stack.Screen name="Splash"             component={SplashScreen} />
+        <Stack.Screen name="Phone"              component={PhoneScreen} />
+        <Stack.Screen name="OTP"                component={OTPScreen} />
+        <Stack.Screen name="RoleSelection"      component={RoleSelectionScreen} />
+        <Stack.Screen name="SellerRegistration" component={SellerRegistrationScreen} />
+        <Stack.Screen name="AdminLogin"         component={AdminLoginScreen} />
+        <Stack.Screen name="AdminDashboard"     component={AdminDashboardScreen} />
       </Stack.Navigator>
     );
   }
 
-  if (user?.mode === 'seller') {
-    return (
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="SellerRoot" component={SellerRoot} />
-      </Stack.Navigator>
-    );
+  if (user?.role === 'seller') {
+    if (user.sellerStatus === 'approved') {
+      return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="SellerRoot" component={SellerRoot} />
+          <Stack.Screen name="SellerRegistration" component={SellerRegistrationScreen} />
+        </Stack.Navigator>
+      );
+    } else {
+      return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="SellerPending"      component={SellerPendingScreen} />
+          <Stack.Screen name="SellerRegistration" component={SellerRegistrationScreen} />
+        </Stack.Navigator>
+      );
+    }
   }
 
   return (

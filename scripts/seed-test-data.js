@@ -190,6 +190,56 @@ async function seed() {
     console.log('Customer seeded.');
   }
 
+  // 4. Seed Pending Seller
+  console.log('Processing test pending seller...');
+  const pendingSeller = {
+    email: 'pending_seller@test.com',
+    password: 'Test1234!',
+    full_name: 'سارة خالد',
+    phone: '+201555555555',
+    kitchen_name: 'مطبخ سارة',
+    region: 'المعادي'
+  };
+
+  const { data: authPending, error: authPendingError } = await supabase.auth.admin.createUser({
+    email: pendingSeller.email,
+    password: pendingSeller.password,
+    email_confirm: true,
+    phone: pendingSeller.phone,
+    phone_confirm: true
+  });
+
+  let pendingId;
+  if (authPendingError) {
+    if (authPendingError.message.includes('already registered')) {
+      const { data: users } = await supabase.auth.admin.listUsers();
+      pendingId = users.users.find(u => u.email === pendingSeller.email).id;
+    } else {
+      console.error('Error creating auth pending seller:', authPendingError.message);
+    }
+  } else {
+    pendingId = authPending.user.id;
+  }
+
+  if (pendingId) {
+    await supabase.from('users').upsert({
+      id: pendingId,
+      full_name: pendingSeller.full_name,
+      phone: pendingSeller.phone,
+      role: 'seller',
+      region_id: getRegionId(pendingSeller.region),
+      is_active: true
+    });
+
+    await supabase.from('seller_profiles').upsert({
+      user_id: pendingId,
+      kitchen_name: pendingSeller.kitchen_name,
+      status: 'pending',
+      region_id: getRegionId(pendingSeller.region)
+    });
+    console.log('Pending seller seeded.');
+  }
+
   console.log('--- Seeding Complete ---');
 }
 

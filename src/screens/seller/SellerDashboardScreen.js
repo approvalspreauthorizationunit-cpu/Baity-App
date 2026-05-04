@@ -33,6 +33,7 @@ export default function SellerDashboardScreen({ navigation }) {
   const [stats, setStats] = useState({ active: 0, today: 0, earnings: 0 });
   const [activeOrders, setActiveOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [expiryWarning, setExpiryWarning] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -50,6 +51,20 @@ export default function SellerDashboardScreen({ navigation }) {
 
       if (profileError || !sellerProfile) throw profileError || new Error('Profile not found');
       setProfile(sellerProfile);
+
+      // Check Health Cert Expiry
+      if (sellerProfile.health_certificate_expiry) {
+        const expiry = new Date(sellerProfile.health_certificate_expiry);
+        const today = new Date();
+        const diffTime = expiry - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 30 && diffDays >= 0) {
+          setExpiryWarning(`تنبيه: شهادتك الصحية ستنتهي في ${sellerProfile.health_certificate_expiry}. يرجى تجديدها.`);
+        } else if (diffDays < 0) {
+          setExpiryWarning(`تنبيه: شهادتك الصحية انتهت في ${sellerProfile.health_certificate_expiry}. يرجى تجديدها فوراً.`);
+        }
+      }
 
       // 2. Today's stats
       const startOfDay = new Date();
@@ -96,11 +111,11 @@ export default function SellerDashboardScreen({ navigation }) {
 
   const toggleOnline = async () => {
     if (!profile) return;
-    const newStatus = !profile.is_available; // Using is_available as online toggle for now
+    const newStatus = !profile.is_available;
     try {
        const { error } = await supabase
          .from('seller_profiles')
-         .update({ is_available: newStatus }) // This should probably be is_online if we add it
+         .update({ is_available: newStatus })
          .eq('id', profile.id);
 
        if (error) throw error;
@@ -153,6 +168,13 @@ export default function SellerDashboardScreen({ navigation }) {
           {stats.active > 0 && <View style={styles.notifDot} />}
         </View>
       </View>
+
+      {expiryWarning && (
+        <View style={styles.warningBanner}>
+          <Ionicons name="warning-outline" size={18} color={colors.white} />
+          <Text style={styles.warningText}>{expiryWarning}</Text>
+        </View>
+      )}
 
       <ScrollView showsVerticalScrollIndicator={false} onRefresh={loadDashboardData} refreshing={loading}>
         {/* Online/Offline Toggle */}
@@ -340,6 +362,8 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 8, right: 8, width: 8, height: 8,
     borderRadius: 4, backgroundColor: colors.error,
   },
+  warningBanner: { backgroundColor: colors.error, padding: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  warningText: { color: colors.white, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
   onlineCard: {
     margin: 12, borderRadius: 14, padding: 14,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

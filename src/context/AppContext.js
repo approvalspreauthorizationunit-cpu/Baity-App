@@ -262,8 +262,18 @@ export function AppProvider({ children }) {
           .select('*')
           .eq('id', session.user.id)
           .single()
+
         if (profile) {
-          dispatch({ type: 'LOGIN', payload: { ...profile, supabaseUser: session.user } })
+          let sellerStatus = null;
+          if (profile.role === 'seller') {
+            const { data: sellerProfile } = await supabase
+              .from('seller_profiles')
+              .select('status')
+              .eq('user_id', session.user.id)
+              .single();
+            sellerStatus = sellerProfile?.status;
+          }
+          dispatch({ type: 'LOGIN', payload: { ...profile, sellerStatus, supabaseUser: session.user } })
         } else {
           dispatch({ type: 'SET_LOADING', payload: false })
         }
@@ -299,7 +309,7 @@ export function AppProvider({ children }) {
 
   const switchMode = (mode) => {
     const updatedUser = { ...state.user, mode };
-    AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+    // AsyncStorage.setItem('user', JSON.stringify(updatedUser)); // We don't need this anymore as we use Supabase session
     dispatch({ type: 'SWITCH_MODE', payload: mode });
   };
 
@@ -353,7 +363,7 @@ export function AppProvider({ children }) {
 
   const updateUser = (data) => {
     const updatedUser = { ...state.user, ...data };
-    AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+    // AsyncStorage.setItem('user', JSON.stringify(updatedUser));
     dispatch({ type: 'UPDATE_USER', payload: data });
   };
 
