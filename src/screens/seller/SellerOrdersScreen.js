@@ -40,8 +40,9 @@ export default function SellerOrdersScreen() {
   const [filter, setFilter] = useState('الكل');
 
   useEffect(() => {
-    let sellerProfileId = null;
-    const fetchAndSubscribe = async () => {
+    let channel = null;
+
+    const setup = async () => {
       // 1. Get seller profile
       const { data: profile } = await supabase
         .from('seller_profiles')
@@ -50,12 +51,12 @@ export default function SellerOrdersScreen() {
         .single();
 
       if (!profile) return;
-      sellerProfileId = profile.id;
+      const sellerProfileId = profile.id;
 
       await loadOrders(sellerProfileId);
 
       // 2. Subscribe to realtime
-      const channel = supabase
+      channel = supabase
         .channel('seller-orders')
         .on('postgres_changes', {
           event: '*',
@@ -66,15 +67,12 @@ export default function SellerOrdersScreen() {
           loadOrders(sellerProfileId);
         })
         .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     };
 
-    const cleanup = fetchAndSubscribe();
+    setup();
+
     return () => {
-       cleanup.then(unsub => unsub?.());
+      if (channel) supabase.removeChannel(channel);
     };
   }, []);
 

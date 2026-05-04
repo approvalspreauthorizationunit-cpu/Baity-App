@@ -30,6 +30,7 @@ import CheckoutScreen from './src/screens/customer/CheckoutScreen';
 import OrderTrackingScreen from './src/screens/customer/OrderTrackingScreen';
 import OrderHistoryScreen from './src/screens/customer/OrderHistoryScreen';
 import CustomerProfileScreen from './src/screens/customer/CustomerProfileScreen';
+import SpecialRequestsScreen from './src/screens/customer/SpecialRequestsScreen';
 
 // Seller Screens
 import SellerDashboardScreen from './src/screens/seller/SellerDashboardScreen';
@@ -39,6 +40,7 @@ import AddProductScreen from './src/screens/seller/AddProductScreen';
 import SellerWalletScreen from './src/screens/seller/SellerWalletScreen';
 import SellerSetupScreen from './src/screens/seller/SellerSetupScreen';
 import SellerPendingScreen from './src/screens/seller/SellerPendingScreen';
+import SpecialRequestsSellerScreen from './src/screens/seller/SpecialRequestsSellerScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -70,6 +72,7 @@ function CustomerTabs() {
         tabBarIcon: ({ color, size, focused }) => {
           const icons = {
             'الرئيسية': focused ? 'home' : 'home-outline',
+            'طلب خاص': focused ? 'clipboard' : 'clipboard-outline',
             'طلباتي':   focused ? 'receipt' : 'receipt-outline',
             'السلة':    focused ? 'cart' : 'cart-outline',
             'حسابي':    focused ? 'person' : 'person-outline',
@@ -79,6 +82,7 @@ function CustomerTabs() {
       })}
     >
       <Tab.Screen name="الرئيسية" component={CustomerHomeStack} />
+      <Tab.Screen name="طلب خاص" component={SpecialRequestsScreen} />
       <Tab.Screen name="طلباتي"   component={OrderHistoryScreen} />
       <Tab.Screen
         name="السلة"
@@ -128,6 +132,7 @@ function SellerTabs() {
           const icons = {
             'لوحتي':    focused ? 'grid' : 'grid-outline',
             'الطلبات':  focused ? 'list' : 'list-outline',
+            'طلبات خاصة': focused ? 'megaphone' : 'megaphone-outline',
             'منتجاتي':  focused ? 'fast-food' : 'fast-food-outline',
             'المحفظة':  focused ? 'wallet' : 'wallet-outline',
           };
@@ -137,6 +142,7 @@ function SellerTabs() {
     >
       <Tab.Screen name="لوحتي"   component={SellerDashboardScreen} />
       <Tab.Screen name="الطلبات" component={SellerOrdersScreen} />
+      <Tab.Screen name="طلبات خاصة" component={SpecialRequestsSellerScreen} />
       <Tab.Screen name="منتجاتي" component={SellerProductsStack} />
       <Tab.Screen name="المحفظة" component={SellerWalletScreen} />
     </Tab.Navigator>

@@ -240,6 +240,60 @@ async function seed() {
     console.log('Pending seller seeded.');
   }
 
+  // 5. Seed Special Request & Offer
+  console.log('Seeding special request and offer...');
+  const { data: customerUser } = await supabase.from('users').select('id, region_id').eq('phone', '+201012345678').single();
+  const { data: seller1Profile } = await supabase.from('seller_profiles').select('id').eq('kitchen_name', 'مطبخ أم أحمد').single();
+
+  if (customerUser && seller1Profile) {
+    // Check if request already exists
+    let { data: request } = await supabase
+        .from('special_requests')
+        .select('id')
+        .eq('customer_id', customerUser.id)
+        .eq('description', 'عزومة عيد ميلاد 15 شخص')
+        .single();
+
+    if (!request) {
+        const { data: newReq, error: reqError } = await supabase.from('special_requests').insert({
+            customer_id: customerUser.id,
+            region_id: customerUser.region_id,
+            description: 'عزومة عيد ميلاد 15 شخص',
+            requested_items: [
+                { name: 'كشري', quantity: 15 },
+                { name: 'سلطة خضراء', quantity: 5 }
+            ],
+            delivery_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            status: 'open'
+        }).select().single();
+
+        if (reqError) console.error('Error seeding request:', reqError.message);
+        request = newReq;
+    }
+
+    if (request) {
+        // Check if offer exists
+        const { data: offer } = await supabase
+            .from('special_request_offers')
+            .select('id')
+            .eq('request_id', request.id)
+            .eq('seller_id', seller1Profile.id)
+            .single();
+
+        if (!offer) {
+            const { error: offerError } = await supabase.from('special_request_offers').insert({
+                request_id: request.id,
+                seller_id: seller1Profile.id,
+                price: 450,
+                notes: 'يشمل التوصيل والأطباق',
+                status: 'pending'
+            });
+
+            if (offerError) console.error('Error seeding offer:', offerError.message);
+        }
+    }
+  }
+
   console.log('--- Seeding Complete ---');
 }
 

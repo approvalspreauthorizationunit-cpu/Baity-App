@@ -33,7 +33,8 @@ export default function CustomerHomeScreen({ navigation }) {
         .select(`
           *,
           users (full_name, avatar_url, region_id),
-          products (id, name, price, category, is_available)
+          products (id, name, price, category, is_available),
+          ratings (score)
         `)
         .eq('status', 'approved');
 
@@ -47,16 +48,20 @@ export default function CustomerHomeScreen({ navigation }) {
           const minPrice = prices.length ? Math.min(...prices) : 0;
           const maxPrice = prices.length ? Math.max(...prices) : 0;
 
+          const totalScore = s.ratings?.reduce((sum, r) => sum + r.score, 0) || 0;
+          const reviewCount = s.ratings?.length || 0;
+          const avgRating = reviewCount > 0 ? (totalScore / reviewCount).toFixed(1) : 'جديد';
+
           return {
             id: s.id,
             name: s.kitchen_name || s.users?.full_name || 'بائعة',
             specialty: s.bio || 'أكل بيتي',
             categories: [...new Set(sellerProducts.map(p => p.category))].filter(Boolean),
-            rating: 4.5, // Placeholder
-            reviewCount: 0, // Placeholder
+            rating: avgRating,
+            reviewCount: reviewCount,
             distance: 0.8, // Placeholder
             priceRange: prices.length ? `${minPrice}-${maxPrice}` : '0',
-            isOnline: true, // Placeholder
+            isOnline: s.is_available,
             image: s.users?.avatar_url
           };
         });

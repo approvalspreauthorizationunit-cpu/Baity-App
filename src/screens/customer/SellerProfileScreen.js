@@ -30,6 +30,7 @@ export default function SellerProfileScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const [seller, setSeller] = useState(null);
   const [products, setProducts] = useState([]);
+  const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('الكل');
 
@@ -44,7 +45,8 @@ export default function SellerProfileScreen({ navigation, route }) {
         .from('seller_profiles')
         .select(`
           *,
-          users (full_name, avatar_url)
+          users (full_name, avatar_url),
+          ratings (score)
         `)
         .eq('id', sellerId)
         .single();
@@ -59,16 +61,30 @@ export default function SellerProfileScreen({ navigation, route }) {
 
       if (productsError) throw productsError;
 
+      const { data: ratingsData } = await supabase
+        .from('ratings')
+        .select(`
+          score, comment, created_at,
+          users (full_name)
+        `)
+        .eq('seller_id', sellerId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      const totalScore = sellerData.ratings?.reduce((sum, r) => sum + r.score, 0) || 0;
+      const reviewCount = sellerData.ratings?.length || 0;
+      const avgRating = reviewCount > 0 ? (totalScore / reviewCount).toFixed(1) : 'جديد';
+
       const mappedSeller = {
         ...sellerData,
         name: sellerData.kitchen_name || sellerData.users?.full_name || 'بائعة',
         image: sellerData.users?.avatar_url,
         specialty: sellerData.bio || 'أكل بيتي',
-        rating: 4.5, // Placeholder
-        reviewCount: 0, // Placeholder
+        rating: avgRating,
+        reviewCount: reviewCount,
         distance: 0.8, // Placeholder
         priceRange: '15-100', // Placeholder
-        isOnline: true, // Placeholder
+        isOnline: sellerData.is_available,
         address: sellerData.address || 'القاهرة',
         workingHours: sellerData.working_hours ? { from: sellerData.working_hours.split(' - ')[0], to: sellerData.working_hours.split(' - ')[1] } : { from: '9:00', to: '21:00' },
         totalOrders: 0 // Placeholder
@@ -76,6 +92,7 @@ export default function SellerProfileScreen({ navigation, route }) {
 
       setSeller(mappedSeller);
       setProducts(productsData || []);
+      setRatings(ratingsData || []);
     } catch (err) {
       console.error('Error loading seller data:', err.message);
       Alert.alert('خطأ', 'تعذر تحميل بيانات البائعة');
@@ -204,6 +221,23 @@ export default function SellerProfileScreen({ navigation, route }) {
             </TouchableOpacity>
           ))}
         </ScrollView>
+
+        {/* Ratings Section */}
+        {ratings.length > 0 && (
+          <View style={styles.ratingsSection}>
+            <Text style={styles.sectionTitle}>التقييمات ({seller.reviewCount})</Text>
+            {ratings.map((review, i) => (
+              <View key={i} style={styles.reviewCard}>
+                <View style={styles.reviewHeader}>
+                  <Text style={styles.reviewerName}>{review.users?.full_name}</Text>
+                  <StarRow rating={review.score} />
+                </View>
+                {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
+                <Text style={styles.reviewDate}>{new Date(review.created_at).toLocaleDateString('ar-EG')}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Products */}
         <View style={styles.productsSection}>
@@ -346,6 +380,12 @@ const styles = StyleSheet.create({
   unavailableText: { fontSize: 10, color: colors.white },
   productDesc: { fontSize: 12, color: colors.textLight, lineHeight: 18, textAlign: 'right', marginBottom: 8 },
   productFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  ratingsSection: { paddingHorizontal: 12, marginBottom: 20 },
+  reviewCard: { backgroundColor: colors.white, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border },
+  reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  reviewerName: { fontSize: 13, fontWeight: 'bold' },
+  reviewComment: { fontSize: 12, color: colors.text, textAlign: 'right', marginBottom: 4 },
+  reviewDate: { fontSize: 10, color: colors.textLight, textAlign: 'right' },
   productMeta: { gap: 4 },
   price: { fontSize: 16, fontWeight: 'bold', color: colors.primary },
   prepTime: { flexDirection: 'row', alignItems: 'center', gap: 3 },

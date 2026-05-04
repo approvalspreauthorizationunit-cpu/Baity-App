@@ -85,12 +85,19 @@ Stored in .env.local (never hardcoded)
 | 2026-05-04 | Post-delivery rating system implemented | ✅ Done |
 | 2026-05-04 | SellerOrdersScreen — order status updates trigger Edge Function | ✅ Done |
 | 2026-05-04 | SellerWalletScreen — real wallet data, transactions, withdrawal flow | ✅ Done |
+| 2026-05-05 | Special Requests screen for customers (post + view + accept offers) | ✅ Done |
+| 2026-05-05 | Special Requests screen for sellers (view + submit offers) | ✅ Done |
+| 2026-05-05 | Realtime updates for offers and requests in region | ✅ Done |
+| 2026-05-05 | Order created automatically when offer is accepted | ✅ Done |
+| 2026-05-05 | Seller average rating displayed dynamically across the app | ✅ Done |
+| 2026-05-05 | Detailed reviews section added to SellerProfileScreen | ✅ Done |
+| 2026-05-05 | Special Requests tabs added to navigation for both roles | ✅ Done |
 
 ## Pending Tasks
-- Special Requests (bidding feature) — full flow
 - Push notifications for new orders (future)
-- Ratings display on seller profile
 - Performance optimization and error boundary setup
+- Final QA and bug fixes before launch
+- Remove all test/seed data from Supabase before launch
 
 ## Business Rules
 - Platform commission: 10% default (configurable per seller)
@@ -102,6 +109,10 @@ Stored in .env.local (never hardcoded)
 - Special requests are visible only to approved sellers in the same region
 
 ## Notes & Decisions
+- **Special Requests**: Implemented a bidding system where customers post requests and sellers in the same region submit offers. Realtime is used to notify sellers of new requests and customers of new offers.
+- **Offer Acceptance**: Accepting an offer automatically closes the request, rejects all other offers, and creates a real order in the `orders` table.
+- **Seller Ratings**: Implemented dynamic average rating calculation from the `ratings` table, displayed on Home, Profile, and Offer cards.
+- **Database Integrity**: Added unique constraints for special requests and offers to prevent duplicate data during seeding and app usage.
 - **Supabase Auth**: Implemented international phone number formatting (+20) for SMS OTP.
 - **Data Integration**: Successfully replaced all major mock data flows with real-time Supabase queries.
 - **Seller Registration**: Implemented a 3-step registration flow including document upload to Supabase Storage.
