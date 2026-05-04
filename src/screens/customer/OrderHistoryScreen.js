@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar, Alert
+  View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar, Alert, ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
-import { orderStatusLabels } from '../../data/mockData';
+import { supabase } from '../../lib/supabase';
 
 const statusColors = {
   pending: colors.badge.pending,
@@ -15,6 +15,15 @@ const statusColors = {
   ready: colors.badge.ready,
   delivered: colors.badge.delivered,
   cancelled: colors.badge.cancelled,
+};
+
+const statusLabels = {
+  pending: 'في الانتظار',
+  accepted: 'تم القبول',
+  preparing: 'جاري التحضير',
+  ready: 'جاهز للتوصيل',
+  delivered: 'تم التوصيل',
+  cancelled: 'ملغي',
 };
 
 const filters = ['الكل', 'جارية', 'مكتملة', 'ملغية'];
@@ -26,8 +35,37 @@ function formatDate(iso) {
 
 export default function OrderHistoryScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { orders, sellers, addToCart } = useApp();
+  const { user, addToCart } = useApp();
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('الكل');
+
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const loadOrders = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (*, products (name)),
+          seller_profiles (id, kitchen_name, bio)
+        `)
+        .eq('customer_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (err) {
+      console.error('Error loading orders:', err.message);
+      Alert.alert('خطأ', 'تعذر تحميل سجل الطلبات');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredOrders = orders.filter(o => {
     if (filter === 'الكل') return true;
@@ -38,18 +76,23 @@ export default function OrderHistoryScreen({ navigation }) {
   });
 
   const handleReorder = (order) => {
-    const seller = sellers.find(s => s.id === order.sellerId);
+    const seller = order.seller_profiles;
     if (!seller) {
       Alert.alert('تنبيه', 'البائعة غير متاحة حالياً');
       return;
     }
-    order.items.forEach(item => {
-      const product = seller.products?.find(p => p.id === item.productId) || {
-        id: item.productId,
-        name: item.name,
-        price: item.price,
+
+    // Simplistic reorder: just add current items to cart
+    order.order_items.forEach(item => {
+      const product = {
+        id: item.product_id,
+        name: item.products?.name || 'منتج',
+        price: item.unit_price,
       };
-      addToCart(product, seller);
+      addToCart(product, {
+        id: seller.id,
+        name: seller.kitchen_name,
+      });
     });
     navigation.navigate('الرئيسية', { screen: 'Checkout' });
   };
@@ -66,28 +109,28 @@ export default function OrderHistoryScreen({ navigation }) {
             <Ionicons name="storefront-outline" size={24} color={colors.primary} />
           </View>
           <View>
-            <Text style={styles.sellerName}>{order.sellerName}</Text>
-            <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
+            <Text style={styles.sellerName}>{order.seller_profiles?.kitchen_name || 'بائعة'}</Text>
+            <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
           </View>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: statusColors[order.status] + '20' }]}>
           <Text style={[styles.statusText, { color: statusColors[order.status] }]}>
-            {orderStatusLabels[order.status]}
+            {statusLabels[order.status] || order.status}
           </Text>
         </View>
       </View>
 
       <View style={styles.itemsList}>
-        {order.items.slice(0, 2).map((item, i) => (
-          <Text key={i} style={styles.itemText}>• {item.name} × {item.quantity}</Text>
+        {order.order_items?.slice(0, 2).map((item, i) => (
+          <Text key={i} style={styles.itemText}>• {item.products?.name} × {item.quantity}</Text>
         ))}
-        {order.items.length > 2 && (
-          <Text style={styles.moreItems}>+{order.items.length - 2} أصناف أخرى</Text>
+        {order.order_items?.length > 2 && (
+          <Text style={styles.moreItems}>+{order.order_items.length - 2} أصناف أخرى</Text>
         )}
       </View>
 
       <View style={styles.orderBottom}>
-        <Text style={styles.orderTotal}>{order.grandTotal} جنيه</Text>
+        <Text style={styles.orderTotal}>{order.total_amount} جنيه</Text>
         {['pending', 'accepted', 'preparing', 'ready'].includes(order.status) ? (
           <TouchableOpacity
             style={styles.trackBtn}
@@ -130,7 +173,11 @@ export default function OrderHistoryScreen({ navigation }) {
         ))}
       </View>
 
-      {filteredOrders.length === 0 ? (
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : filteredOrders.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="receipt-outline" size={64} color={colors.textLight} />
           <Text style={styles.emptyTitle}>لا توجد طلبات</Text>
@@ -143,6 +190,8 @@ export default function OrderHistoryScreen({ navigation }) {
           renderItem={renderOrder}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onRefresh={loadOrders}
+          refreshing={loading}
         />
       )}
     </View>
@@ -151,12 +200,13 @@ export default function OrderHistoryScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     paddingHorizontal: 16, paddingVertical: 14,
     backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  headerTitle: { fontSize: 22, fontWeight: 'bold', color: colors.text },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: colors.text, textAlign: 'right' },
   orderCount: { fontSize: 13, color: colors.textLight },
   filterRow: {
     flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, gap: 8,

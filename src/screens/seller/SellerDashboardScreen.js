@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Switch
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Switch, ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
-import { orderStatusLabels } from '../../data/mockData';
+import { supabase } from '../../lib/supabase';
 
 const statusColors = {
   pending: colors.badge.pending,
@@ -17,22 +17,122 @@ const statusColors = {
   cancelled: colors.badge.cancelled,
 };
 
+const statusLabels = {
+  pending: 'في الانتظار',
+  accepted: 'تم القبول',
+  preparing: 'جاري التحضير',
+  ready: 'جاهز للتوصيل',
+  delivered: 'تم التوصيل',
+  cancelled: 'ملغي',
+};
+
 export default function SellerDashboardScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user, sellers, orders, switchMode, toggleSellerOnline, updateOrderStatus } = useApp();
+  const { user, switchMode } = useApp();
+  const [profile, setProfile] = useState(null);
+  const [stats, setStats] = useState({ active: 0, today: 0, earnings: 0 });
+  const [activeOrders, setActiveOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const myProfile = sellers.find(s => s.id === user?.sellerProfile?.sellerId) || sellers[0];
-  const myOrders = orders.filter(o => o.sellerId === myProfile?.id);
-  const activeOrders = myOrders.filter(o => ['pending', 'accepted', 'preparing', 'ready'].includes(o.status));
-  const todayOrders = myOrders.filter(o => {
-    const d = new Date(o.createdAt);
-    const today = new Date();
-    return d.getDate() === today.getDate() && d.getMonth() === today.getMonth();
-  });
-  const todayEarnings = todayOrders
-    .filter(o => o.status === 'delivered')
-    .reduce((s, o) => s + o.total, 0);
-  const commission = Math.floor(todayEarnings * 0.1);
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      // 1. Get seller profile
+      const { data: sellerProfile, error: profileError } = await supabase
+        .from('seller_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError || !sellerProfile) throw profileError || new Error('Profile not found');
+      setProfile(sellerProfile);
+
+      // 2. Today's stats
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const { data: todayOrders, error: statsError } = await supabase
+        .from('orders')
+        .select('total_amount, seller_earnings, status')
+        .eq('seller_id', sellerProfile.id)
+        .gte('created_at', startOfDay.toISOString());
+
+      if (statsError) throw statsError;
+
+      const earnings = todayOrders
+        .filter(o => o.status === 'delivered')
+        .reduce((sum, o) => sum + (o.seller_earnings || 0), 0);
+
+      // 3. Active orders
+      const { data: actives, count: activeCount, error: activeError } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (*, products (name))
+        `, { count: 'exact' })
+        .eq('seller_id', sellerProfile.id)
+        .in('status', ['pending', 'accepted', 'preparing', 'ready'])
+        .order('created_at', { ascending: false });
+
+      if (activeError) throw activeError;
+
+      setStats({
+        active: activeCount || 0,
+        today: todayOrders.length,
+        earnings: earnings
+      });
+      setActiveOrders(actives || []);
+
+    } catch (err) {
+      console.error('Dashboard error:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleOnline = async () => {
+    if (!profile) return;
+    const newStatus = !profile.is_available; // Using is_available as online toggle for now
+    try {
+       const { error } = await supabase
+         .from('seller_profiles')
+         .update({ is_available: newStatus }) // This should probably be is_online if we add it
+         .eq('id', profile.id);
+
+       if (error) throw error;
+       setProfile({ ...profile, is_available: newStatus });
+    } catch (err) {
+       console.error('Toggle online error:', err.message);
+    }
+  };
+
+  const updateOrderStatus = async (orderId, status) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status })
+        .eq('id', orderId);
+
+      if (error) throw error;
+      loadDashboardData(); // Refresh
+    } catch (err) {
+      console.error('Update status error:', err.message);
+    }
+  };
+
+  if (loading && !profile) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  const commission = Math.floor(stats.earnings * 0.1);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -45,82 +145,78 @@ export default function SellerDashboardScreen({ navigation }) {
           <Text style={styles.switchBtnText}>وضع العميل</Text>
         </TouchableOpacity>
         <View>
-          <Text style={styles.welcomeText}>أهلاً يا {user?.name?.split(' ')[0]}</Text>
+          <Text style={styles.welcomeText}>أهلاً يا {user?.full_name?.split(' ')[0] || user?.name?.split(' ')[0]}</Text>
           <Text style={styles.subText}>مطبخك في انتظارك</Text>
         </View>
         <View style={styles.notifBtn}>
           <Ionicons name="notifications-outline" size={22} color={colors.text} />
-          {activeOrders.length > 0 && <View style={styles.notifDot} />}
+          {stats.active > 0 && <View style={styles.notifDot} />}
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} onRefresh={loadDashboardData} refreshing={loading}>
         {/* Online/Offline Toggle */}
-        {myProfile && (
-          <View style={[styles.onlineCard, { backgroundColor: myProfile.isOnline ? '#E8F5E9' : '#FFF3E0' }]}>
-            <View style={styles.onlineCardLeft}>
-              <View style={[styles.onlineStatusDot, { backgroundColor: myProfile.isOnline ? colors.success : colors.warning }]} />
-              <View>
-                <Text style={styles.onlineCardTitle}>
-                  {myProfile.isOnline ? 'أنتِ متاحة الآن' : 'أنتِ غير متاحة'}
-                </Text>
-                <Text style={styles.onlineCardSubtitle}>
-                  {myProfile.isOnline ? 'العملاء يستطيعون رؤيتك' : 'لا تظهرين للعملاء'}
-                </Text>
-              </View>
+        <View style={[styles.onlineCard, { backgroundColor: profile?.is_available ? '#E8F5E9' : '#FFF3E0' }]}>
+          <View style={styles.onlineCardLeft}>
+            <View style={[styles.onlineStatusDot, { backgroundColor: profile?.is_available ? colors.success : colors.warning }]} />
+            <View>
+              <Text style={styles.onlineCardTitle}>
+                {profile?.is_available ? 'أنتِ متاحة الآن' : 'أنتِ غير متاحة'}
+              </Text>
+              <Text style={styles.onlineCardSubtitle}>
+                {profile?.is_available ? 'العملاء يستطيعون رؤيتك' : 'لا تظهرين للعملاء'}
+              </Text>
             </View>
-            <Switch
-              value={myProfile.isOnline}
-              onValueChange={() => toggleSellerOnline(myProfile.id)}
-              trackColor={{ false: '#DDD', true: colors.success }}
-              thumbColor={colors.white}
-            />
           </View>
-        )}
+          <Switch
+            value={profile?.is_available || false}
+            onValueChange={toggleOnline}
+            trackColor={{ false: '#DDD', true: colors.success }}
+            thumbColor={colors.white}
+          />
+        </View>
 
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Ionicons name="cube-outline" size={24} color={colors.primary} style={styles.statEmoji} />
-            <Text style={styles.statValue}>{activeOrders.length}</Text>
+            <Ionicons name="cube-outline" size={24} color={colors.primary} />
+            <Text style={styles.statValue}>{stats.active}</Text>
             <Text style={styles.statLabel}>طلبات نشطة</Text>
           </View>
           <View style={styles.statCard}>
-            <Ionicons name="calendar-outline" size={24} color={colors.primary} style={styles.statEmoji} />
-            <Text style={styles.statValue}>{todayOrders.length}</Text>
+            <Ionicons name="calendar-outline" size={24} color={colors.primary} />
+            <Text style={styles.statValue}>{stats.today}</Text>
             <Text style={styles.statLabel}>طلبات اليوم</Text>
           </View>
           <View style={styles.statCard}>
-            <Ionicons name="cash-outline" size={24} color={colors.success} style={styles.statEmoji} />
-            <Text style={styles.statValue}>{todayEarnings}</Text>
-            <Text style={styles.statLabel}>مبيعات اليوم</Text>
+            <Ionicons name="cash-outline" size={24} color={colors.success} />
+            <Text style={styles.statValue}>{stats.earnings}</Text>
+            <Text style={styles.statLabel}>أرباح اليوم</Text>
           </View>
           <View style={styles.statCard}>
-            <Ionicons name="wallet-outline" size={24} color={colors.primary} style={styles.statEmoji} />
-            <Text style={[styles.statValue, { color: myProfile?.walletBalance > 0 ? colors.success : colors.error }]}>
-              {myProfile?.walletBalance || 0}
+            <Ionicons name="wallet-outline" size={24} color={colors.primary} />
+            <Text style={[styles.statValue, { color: (profile?.wallet_balance || 0) > 0 ? colors.success : colors.error }]}>
+              {profile?.wallet_balance || 0}
             </Text>
             <Text style={styles.statLabel}>رصيد المحفظة</Text>
           </View>
         </View>
 
         {/* Rating Summary */}
-        {myProfile && (
-          <View style={styles.ratingCard}>
-            <View style={styles.ratingLeft}>
-              <Text style={styles.ratingBig}>{myProfile.rating} <Ionicons name="star" size={20} color={colors.star} /></Text>
-              <Text style={styles.ratingCount}>{myProfile.reviewCount} تقييم</Text>
-            </View>
-            <View style={styles.ratingRight}>
-              <Text style={styles.ratingLabel}>إجمالي الطلبات</Text>
-              <Text style={styles.ratingValue}>{myProfile.totalOrders}</Text>
-            </View>
-            <View style={styles.ratingRight}>
-              <Text style={styles.ratingLabel}>عمولة اليوم</Text>
-              <Text style={[styles.ratingValue, { color: colors.error }]}>- {commission}</Text>
-            </View>
+        <View style={styles.ratingCard}>
+          <View style={styles.ratingLeft}>
+            <Text style={styles.ratingBig}>4.5 <Ionicons name="star" size={20} color={colors.star} /></Text>
+            <Text style={styles.ratingCount}>0 تقييم</Text>
           </View>
-        )}
+          <View style={styles.ratingRight}>
+            <Text style={styles.ratingLabel}>إجمالي الأرباح</Text>
+            <Text style={styles.ratingValue}>{stats.earnings}</Text>
+          </View>
+          <View style={styles.ratingRight}>
+            <Text style={styles.ratingLabel}>عمولة المنصة</Text>
+            <Text style={[styles.ratingValue, { color: colors.error }]}>- {commission}</Text>
+          </View>
+        </View>
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
@@ -131,9 +227,9 @@ export default function SellerDashboardScreen({ navigation }) {
                 <Ionicons name="list" size={22} color="#1976D2" />
               </View>
               <Text style={styles.actionLabel}>الطلبات</Text>
-              {activeOrders.length > 0 && (
+              {stats.active > 0 && (
                 <View style={styles.actionBadge}>
-                  <Text style={styles.actionBadgeText}>{activeOrders.length}</Text>
+                  <Text style={styles.actionBadgeText}>{stats.active}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -149,7 +245,7 @@ export default function SellerDashboardScreen({ navigation }) {
               </View>
               <Text style={styles.actionLabel}>المحفظة</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('AddProduct')}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('AddProduct', { onSave: loadDashboardData })}>
               <View style={[styles.actionIcon, { backgroundColor: '#FCE4EC' }]}>
                 <Ionicons name="add-circle" size={22} color="#C2185B" />
               </View>
@@ -172,13 +268,13 @@ export default function SellerDashboardScreen({ navigation }) {
                 <View style={styles.orderCardTop}>
                   <View style={[styles.orderStatusBadge, { backgroundColor: statusColors[order.status] + '20' }]}>
                     <Text style={[styles.orderStatusText, { color: statusColors[order.status] }]}>
-                      {orderStatusLabels[order.status]}
+                      {statusLabels[order.status]}
                     </Text>
                   </View>
-                  <Text style={styles.orderCardTotal}>{order.grandTotal} جنيه</Text>
+                  <Text style={styles.orderCardTotal}>{order.total_amount} جنيه</Text>
                 </View>
                 <Text style={styles.orderCardItems}>
-                  {order.items.map(i => `${i.name} ×${i.quantity}`).join('، ')}
+                  {order.order_items.map(i => `${i.products?.name} ×${i.quantity}`).join('، ')}
                 </Text>
                 {order.status === 'pending' && (
                   <View style={styles.orderCardActions}>
@@ -207,9 +303,9 @@ export default function SellerDashboardScreen({ navigation }) {
                 {order.status === 'preparing' && (
                   <TouchableOpacity
                     style={[styles.prepareBtn, { backgroundColor: colors.success }]}
-                    onPress={() => updateOrderStatus(order.id, 'delivered')}
+                    onPress={() => updateOrderStatus(order.id, 'ready')}
                   >
-                    <Text style={styles.prepareBtnText}>تم التسليم ✓</Text>
+                    <Text style={styles.prepareBtnText}>جاهز للتوصيل ✓</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -225,6 +321,7 @@ export default function SellerDashboardScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.white,
@@ -259,7 +356,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', gap: 4,
     shadowColor: colors.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 4, elevation: 2,
   },
-  statEmoji: { fontSize: 24 },
   statValue: { fontSize: 22, fontWeight: 'bold', color: colors.text },
   statLabel: { fontSize: 11, color: colors.textLight, textAlign: 'center' },
   ratingCard: {

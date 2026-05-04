@@ -1,53 +1,85 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, StatusBar, Alert
+  TouchableOpacity, StatusBar, Alert, ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
+import { supabase } from '../../lib/supabase';
 
 const foodCategories = ['كشري', 'فول وطعمية', 'مشاوي', 'دجاج', 'لحوم', 'سمك', 'حلويات', 'مخبوزات', 'سلطات', 'مشروبات', 'مقبلات', 'أطباق شامية', 'أخرى'];
 
 export default function AddProductScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { addProduct, updateProduct, user, sellers } = useApp();
+  const { user } = useApp();
+  const [loading, setLoading] = useState(false);
 
   const existingProduct = route?.params?.product;
-  const sellerId = route?.params?.sellerId || user?.sellerProfile?.sellerId || sellers[0]?.id;
   const isEdit = !!existingProduct;
 
   const [name, setName] = useState(existingProduct?.name || '');
   const [description, setDescription] = useState(existingProduct?.description || '');
   const [price, setPrice] = useState(existingProduct?.price?.toString() || '');
-  const [prepTime, setPrepTime] = useState(existingProduct?.prepTime?.toString() || '');
+  const [prepTime, setPrepTime] = useState(existingProduct?.prep_time?.toString() || '');
   const [quantity, setQuantity] = useState(existingProduct?.quantity?.toString() || '');
   const [category, setCategory] = useState(existingProduct?.category || '');
-  const [available, setAvailable] = useState(existingProduct?.available !== false);
+  const [available, setAvailable] = useState(existingProduct?.is_available !== false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) { Alert.alert('تنبيه', 'برجاء إدخال اسم المنتج'); return; }
     if (!price.trim() || isNaN(price)) { Alert.alert('تنبيه', 'برجاء إدخال سعر صحيح'); return; }
     if (!category) { Alert.alert('تنبيه', 'برجاء اختيار فئة المنتج'); return; }
 
-    const product = {
-      ...(existingProduct || {}),
-      name: name.trim(),
-      description: description.trim(),
-      price: parseFloat(price),
-      prepTime: parseInt(prepTime) || 20,
-      quantity: parseInt(quantity) || 10,
-      category,
-      available,
-    };
+    setLoading(true);
+    try {
+      // 1. Get seller profile id
+      const { data: profile } = await supabase
+        .from('seller_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
 
-    if (isEdit) {
-      updateProduct(sellerId, product);
-      Alert.alert('تم', 'تم تحديث المنتج بنجاح', [{ text: 'حسناً', onPress: () => navigation.goBack() }]);
-    } else {
-      addProduct(sellerId, product);
-      Alert.alert('تم', 'تم إضافة المنتج بنجاح', [{ text: 'حسناً', onPress: () => navigation.goBack() }]);
+      if (!profile) throw new Error('Seller profile not found');
+
+      const productData = {
+        name: name.trim(),
+        description: description.trim(),
+        price: parseFloat(price),
+        prep_time: parseInt(prepTime) || 20,
+        quantity: parseInt(quantity) || 10,
+        category,
+        is_available: available,
+      };
+
+      if (isEdit) {
+        const { error } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', existingProduct.id);
+
+        if (error) throw error;
+        Alert.alert('تم', 'تم تحديث المنتج بنجاح', [{ text: 'حسناً', onPress: () => {
+          route.params?.onSave?.();
+          navigation.goBack();
+        } }]);
+      } else {
+        const { error } = await supabase
+          .from('products')
+          .insert({ ...productData, seller_id: profile.id });
+
+        if (error) throw error;
+        Alert.alert('تم', 'تم إضافة المنتج بنجاح', [{ text: 'حسناً', onPress: () => {
+          route.params?.onSave?.();
+          navigation.goBack();
+        } }]);
+      }
+    } catch (err) {
+      console.error('Error saving product:', err.message);
+      Alert.alert('خطأ', 'تعذر حفظ بيانات المنتج');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -59,8 +91,8 @@ export default function AddProductScreen({ navigation, route }) {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{isEdit ? 'تعديل المنتج' : 'إضافة منتج جديد'}</Text>
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveBtnText}>حفظ</Text>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading}>
+          {loading ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveBtnText}>حفظ</Text>}
         </TouchableOpacity>
       </View>
 
@@ -87,6 +119,7 @@ export default function AddProductScreen({ navigation, route }) {
               placeholder="مثال: كشري كبير"
               placeholderTextColor={colors.textMuted}
               textAlign="right"
+              editable={!loading}
             />
           </View>
 
@@ -102,6 +135,7 @@ export default function AddProductScreen({ navigation, route }) {
               numberOfLines={3}
               textAlignVertical="top"
               textAlign="right"
+              editable={!loading}
             />
           </View>
 
@@ -116,6 +150,7 @@ export default function AddProductScreen({ navigation, route }) {
                 keyboardType="numeric"
                 placeholderTextColor={colors.textMuted}
                 textAlign="right"
+                editable={!loading}
               />
             </View>
             <View style={[styles.field, { flex: 1 }]}>
@@ -128,6 +163,7 @@ export default function AddProductScreen({ navigation, route }) {
                 keyboardType="numeric"
                 placeholderTextColor={colors.textMuted}
                 textAlign="right"
+                editable={!loading}
               />
             </View>
           </View>
@@ -142,6 +178,7 @@ export default function AddProductScreen({ navigation, route }) {
               keyboardType="numeric"
               placeholderTextColor={colors.textMuted}
               textAlign="right"
+              editable={!loading}
             />
           </View>
         </View>
@@ -155,6 +192,7 @@ export default function AddProductScreen({ navigation, route }) {
                 key={cat}
                 style={[styles.catChip, category === cat && styles.catChipActive]}
                 onPress={() => setCategory(cat)}
+                disabled={loading}
               >
                 <Text style={[styles.catText, category === cat && styles.catTextActive]}>{cat}</Text>
               </TouchableOpacity>
@@ -172,6 +210,7 @@ export default function AddProductScreen({ navigation, route }) {
             <TouchableOpacity
               style={[styles.toggle, available && styles.toggleActive]}
               onPress={() => setAvailable(!available)}
+              disabled={loading}
             >
               <View style={[styles.toggleThumb, available && styles.toggleThumbActive]} />
             </TouchableOpacity>
@@ -193,7 +232,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: 'bold', color: colors.text },
-  saveBtn: { backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 },
+  saveBtn: { backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, minWidth: 60, alignItems: 'center' },
   saveBtnText: { color: colors.white, fontWeight: 'bold', fontSize: 14 },
   photoSection: { alignItems: 'center', padding: 20 },
   photoPlaceholder: {

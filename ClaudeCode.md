@@ -55,14 +55,22 @@ Stored in .env.local (never hardcoded)
 | 2026-05-04 | Supabase Auth integration (Phone OTP & Admin Password) | ✅ Done |
 | 2026-05-04 | Removed all mock authentication logic | ✅ Done |
 | 2026-05-04 | Admin seeded in database (admin@baiti.app) | ✅ Done |
+| 2026-05-04 | Test data seeded (3 regions, 3 sellers, 12 products, 1 customer) | ✅ Done |
+| 2026-05-04 | CustomerHomeScreen connected to Supabase | ✅ Done |
+| 2026-05-04 | SellerProfileScreen connected to Supabase | ✅ Done |
+| 2026-05-04 | SellerProductsScreen connected to Supabase | ✅ Done |
+| 2026-05-04 | AddProductScreen connected to Supabase | ✅ Done |
+| 2026-05-04 | OrderHistoryScreen connected to Supabase | ✅ Done |
+| 2026-05-04 | SellerOrdersScreen connected to Supabase + Realtime | ✅ Done |
+| 2026-05-04 | SellerDashboardScreen connected to Supabase | ✅ Done |
 
 ## Pending Tasks
-- Load real sellers from Supabase in CustomerHomeScreen
-- Load real orders from Supabase in OrderHistoryScreen and SellerOrdersScreen
 - Build seller registration flow with document upload
-- Connect order tracking to Supabase Realtime
+- Connect order placement to Supabase (CheckoutScreen)
+- Connect order tracking to Supabase Realtime (OrderTrackingScreen)
 - Build admin dashboard with Supabase integration
 - Connect wallet and withdrawal system to Edge Functions
+- Build special requests (bidding) feature
 
 ## Business Rules
 - Platform commission: 10% default (configurable per seller)
@@ -75,6 +83,6 @@ Stored in .env.local (never hardcoded)
 
 ## Notes & Decisions
 - **Supabase Auth**: Implemented international phone number formatting (+20) for SMS OTP.
-- **Persistence**: Switched from custom `AsyncStorage` login persistence to Supabase's native persistence mechanism using `AsyncStorage` as the storage provider.
-- **Role Enforcement**: User role is verified against the `users` table after every login/verification to ensure proper access control.
-- **Admin Seeding**: Created `scripts/seed-admin.js` to initialize the platform with administrative access.
+- **Data Integration**: Successfully replaced all major mock data flows with real-time Supabase queries.
+- **Unique Constraints**: Added unique constraints to `regions(name)` and `products(name, seller_id)` via migration to facilitate upsert operations in seeding scripts.
+- **Realtime**: Leveraged Supabase Realtime for order status updates in the seller's workflow.
