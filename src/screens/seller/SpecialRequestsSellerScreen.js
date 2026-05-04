@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import LoadingScreen from '../../components/LoadingScreen';
+import EmptyState from '../../components/EmptyState';
 
 export default function SpecialRequestsSellerScreen() {
   const insets = useSafeAreaInsets();
@@ -163,9 +165,7 @@ export default function SpecialRequestsSellerScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <LoadingScreen />
       ) : (
         <FlatList
           data={requests}
@@ -175,10 +175,11 @@ export default function SpecialRequestsSellerScreen() {
           refreshing={loading}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="megaphone-outline" size={64} color={colors.textLight} />
-              <Text style={styles.emptyText}>لا توجد طلبات خاصة جديدة في منطقتك حالياً</Text>
-            </View>
+            <EmptyState
+              icon="megaphone-outline"
+              title="لا توجد طلبات خاصة"
+              message="لا توجد طلبات خاصة في منطقتك حالياً"
+            />
           }
         />
       )}

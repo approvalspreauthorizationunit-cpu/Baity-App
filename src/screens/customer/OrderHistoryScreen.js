@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import EmptyState from '../../components/EmptyState';
 
 const statusColors = {
   pending: colors.badge.pending,
@@ -178,11 +179,13 @@ export default function OrderHistoryScreen({ navigation }) {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : filteredOrders.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="receipt-outline" size={64} color={colors.textLight} />
-          <Text style={styles.emptyTitle}>لا توجد طلبات</Text>
-          <Text style={styles.emptySubtitle}>لم تقم بأي طلبات بعد</Text>
-        </View>
+        <EmptyState
+          icon="receipt-outline"
+          title="لا توجد طلبات"
+          message="لم تقم بأي طلبات بعد"
+          actionLabel="ابدأ الطلب الآن"
+          onAction={() => navigation.navigate('الرئيسية')}
+        />
       ) : (
         <FlatList
           data={filteredOrders}

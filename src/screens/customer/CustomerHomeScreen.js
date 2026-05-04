@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
   TouchableOpacity, StatusBar, ScrollView, Platform, ActivityIndicator
@@ -9,6 +9,8 @@ import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
 import SellerCard from '../../components/SellerCard';
+import LoadingScreen from '../../components/LoadingScreen';
+import EmptyState from '../../components/EmptyState';
 
 const categories = ['الكل', 'كشري', 'فتة', 'حلويات', 'مشاوي', 'سلطات', 'خبز', 'ملوخية', 'عصائر'];
 
@@ -117,7 +119,11 @@ export default function CustomerHomeScreen({ navigation }) {
     return result;
   }, [sellers, search, selectedCategory, sortBy]);
 
-  const onlineSellers = sellers.filter(s => s.isOnline).length;
+  const onlineSellers = useMemo(() => sellers.filter(s => s.isOnline).length, [sellers]);
+
+  const handleSearchChange = useCallback((text) => {
+    setSearch(text);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -147,7 +153,7 @@ export default function CustomerHomeScreen({ navigation }) {
           <TextInput
             style={styles.searchInput}
             value={search}
-            onChangeText={setSearch}
+            onChangeText={handleSearchChange}
             placeholder="ابحث عن طعام أو بائعة..."
             placeholderTextColor={colors.textMuted}
             textAlign="right"
@@ -209,11 +215,8 @@ export default function CustomerHomeScreen({ navigation }) {
       </View>
 
       {/* Sellers List */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>جاري تحميل البائعات...</Text>
-        </View>
+      {loading && sellers.length === 0 ? (
+        <LoadingScreen />
       ) : (
         <FlatList
           data={filteredSellers}
@@ -227,11 +230,11 @@ export default function CustomerHomeScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="search-outline" size={60} color={colors.textLight} />
-              <Text style={styles.emptyTitle}>مفيش نتايج</Text>
-              <Text style={styles.emptyText}>جرب تبحث بكلمة تانية</Text>
-            </View>
+            <EmptyState
+              icon="search-outline"
+              title="لا يوجد طهاة متاحون"
+              message="لا يوجد طهاة متاحون في منطقتك حالياً"
+            />
           }
         />
       )}

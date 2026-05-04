@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppProvider, useApp } from './src/context/AppContext';
 import { colors } from './src/theme/colors';
+import ErrorBoundary from './src/components/ErrorBoundary';
 
 // Auth Screens
 import SplashScreen from './src/screens/auth/SplashScreen';
@@ -226,12 +227,14 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AppProvider>
-          <NavigationContainer>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-            <AppNavigator />
-          </NavigationContainer>
-        </AppProvider>
+        <ErrorBoundary>
+          <AppProvider>
+            <NavigationContainer>
+              <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+              <AppNavigator />
+            </NavigationContainer>
+          </AppProvider>
+        </ErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

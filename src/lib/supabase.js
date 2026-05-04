@@ -12,3 +12,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
 })
+
+export const checkConnection = async () => {
+  try {
+    const { error } = await supabase
+      .from('regions')
+      .select('id')
+      .limit(1)
+    return !error
+  } catch {
+    return false
+  }
+}

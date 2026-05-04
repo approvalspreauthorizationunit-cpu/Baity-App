@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import LoadingScreen from '../../components/LoadingScreen';
 
 function TransactionRow({ icon, label, amount, time, type }) {
   const isCredit = type === 'credit';
@@ -142,9 +143,7 @@ export default function SellerWalletScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <LoadingScreen />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Balance Card */}

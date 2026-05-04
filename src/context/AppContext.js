@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../lib/supabase';
+import { supabase, checkConnection } from '../lib/supabase';
 
 const AppContext = createContext();
 
@@ -34,10 +35,19 @@ function appReducer(state, action) {
 
     case 'LOGOUT':
       return {
-        ...state,
+        ...initialState,
+        isLoading: false,
         isLoggedIn: false,
         user: null,
-        cart: { items: [], sellerId: null, sellerName: null, donation: 0, isMealDonation: false },
+        cart: {
+          items: [],
+          sellerId: null,
+          sellerName: null,
+          donation: 0,
+          isMealDonation: false
+        },
+        orders: [],
+        sellers: []
       };
 
     case 'SWITCH_MODE':
@@ -255,6 +265,13 @@ export function AppProvider({ children }) {
 
   const loadStoredData = async () => {
     try {
+      const isConnected = await checkConnection();
+      if (!isConnected) {
+        Alert.alert('خطأ في الاتصال', 'لا يوجد اتصال بالإنترنت، يرجى التحقق من اتصالك');
+        dispatch({ type: 'SET_LOADING', payload: false });
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         const { data: profile } = await supabase

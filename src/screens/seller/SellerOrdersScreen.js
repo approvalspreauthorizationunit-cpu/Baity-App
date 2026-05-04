@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar, ActivityIndicator, Alert
 } from 'react-native';
@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import LoadingScreen from '../../components/LoadingScreen';
+import EmptyState from '../../components/EmptyState';
 
 const filters = ['الكل', 'في الانتظار', 'جارية', 'مكتملة'];
 const statusColors = {
@@ -121,13 +123,13 @@ export default function SellerOrdersScreen() {
     }
   };
 
-  const filteredOrders = orders.filter(o => {
+  const filteredOrders = useMemo(() => orders.filter(o => {
     if (filter === 'الكل') return true;
     if (filter === 'في الانتظار') return o.status === 'pending';
     if (filter === 'جارية') return ['accepted', 'preparing', 'ready'].includes(o.status);
     if (filter === 'مكتملة') return ['delivered', 'cancelled'].includes(o.status);
     return true;
-  });
+  }), [orders, filter]);
 
   const nextStatus = {
     pending: null, // use accept/reject
@@ -234,14 +236,13 @@ export default function SellerOrdersScreen() {
       </View>
 
       {loading && orders.length === 0 ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <LoadingScreen />
       ) : filteredOrders.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="receipt-outline" size={60} color={colors.textLight} />
-          <Text style={styles.emptyTitle}>لا توجد طلبات</Text>
-        </View>
+        <EmptyState
+          icon="receipt-outline"
+          title="لا توجد طلبات"
+          message="لا توجد طلبات حالياً"
+        />
       ) : (
         <FlatList
           data={filteredOrders}

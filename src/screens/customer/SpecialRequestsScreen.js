@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import LoadingScreen from '../../components/LoadingScreen';
+import EmptyState from '../../components/EmptyState';
 
 const TABS = ['طلباتي', 'طلب جديد'];
 
@@ -297,22 +299,29 @@ export default function SpecialRequestsScreen({ navigation }) {
       </View>
 
       {activeTab === 0 ? (
-        <FlatList
-          data={requests}
-          keyExtractor={item => item.id}
-          renderItem={renderRequest}
-          onRefresh={loadRequests}
-          refreshing={loading}
-          contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            !loading && (
-              <View style={styles.emptyState}>
-                <Ionicons name="clipboard-outline" size={64} color={colors.textLight} />
-                <Text style={styles.emptyText}>لم تقم بإضافة أي طلبات خاصة بعد</Text>
-              </View>
-            )
-          }
-        />
+        loading && requests.length === 0 ? (
+          <LoadingScreen />
+        ) : (
+          <FlatList
+            data={requests}
+            keyExtractor={item => item.id}
+            renderItem={renderRequest}
+            onRefresh={loadRequests}
+            refreshing={loading}
+            contentContainerStyle={styles.listContainer}
+            ListEmptyComponent={
+              !loading && (
+                <EmptyState
+                  icon="clipboard-outline"
+                  title="لا توجد طلبات خاصة"
+                  message="لم تقم بإضافة أي طلبات خاصة بعد"
+                  actionLabel="أضف طلب جديد"
+                  onAction={() => setActiveTab(1)}
+                />
+              )
+            }
+          />
+        )
       ) : (
         <ScrollView style={styles.formContainer} keyboardShouldPersistTaps="handled">
           <Text style={styles.label}>وصف الطلب</Text>

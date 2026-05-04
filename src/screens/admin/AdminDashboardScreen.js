@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, FlatList, Switch, Alert, ActivityIndicator, Image, Modal, TextInput
@@ -174,14 +174,16 @@ export default function AdminDashboardScreen({ navigation }) {
     suspended: '#D32F2F'
   };
 
+  const statsDisplay = useMemo(() => stats, [stats]);
+
   const renderOverview = () => (
     <View style={styles.tabContent}>
       <View style={styles.statsGrid}>
-        <StatCard icon="cash-outline" label="إجمالي الإيرادات" value={`${stats.revenue} ج`} color="#F5A623" wide />
-        <StatCard icon="people-outline" label="بائعون نشطون" value={stats.activeSellers} color={colors.primary} />
-        <StatCard icon="document-text-outline" label="طلبات تسجيل" value={stats.pendingSellers} color="#FF9800" />
-        <StatCard icon="cart-outline" label="طلبات اليوم" value={stats.todayOrders} color="#2196F3" />
-        <StatCard icon="wallet-outline" label="سحوبات معلقة" value={stats.pendingWithdrawals} color="#4CAF50" />
+        <StatCard icon="cash-outline" label="إجمالي الإيرادات" value={`${statsDisplay.revenue} ج`} color="#F5A623" wide />
+        <StatCard icon="people-outline" label="بائعون نشطون" value={statsDisplay.activeSellers} color={colors.primary} />
+        <StatCard icon="document-text-outline" label="طلبات تسجيل" value={statsDisplay.pendingSellers} color="#FF9800" />
+        <StatCard icon="cart-outline" label="طلبات اليوم" value={statsDisplay.todayOrders} color="#2196F3" />
+        <StatCard icon="wallet-outline" label="سحوبات معلقة" value={statsDisplay.pendingWithdrawals} color="#4CAF50" />
       </View>
 
       <Text style={styles.sectionTitle}>آخر الطلبات</Text>

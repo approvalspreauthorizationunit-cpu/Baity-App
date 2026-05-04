@@ -27,9 +27,23 @@ export default function AddProductScreen({ navigation, route }) {
   const [category, setCategory] = useState(existingProduct?.category || '');
   const [available, setAvailable] = useState(existingProduct?.is_available !== false);
 
+  const handlePriceChange = (text) => {
+    const cleaned = text.replace(/[^0-9.]/g, '');
+    setPrice(cleaned);
+  };
+
+  const handleNumericChange = (setter) => (text) => {
+    const cleaned = text.replace(/[^0-9]/g, '');
+    setter(cleaned);
+  };
+
   const handleSave = async () => {
     if (!name.trim()) { Alert.alert('تنبيه', 'برجاء إدخال اسم المنتج'); return; }
-    if (!price.trim() || isNaN(price)) { Alert.alert('تنبيه', 'برجاء إدخال سعر صحيح'); return; }
+    const priceNum = parseFloat(price);
+    if (!price.trim() || isNaN(priceNum) || priceNum <= 0) {
+      Alert.alert('تنبيه', 'يرجى إدخال سعر صحيح');
+      return;
+    }
     if (!category) { Alert.alert('تنبيه', 'برجاء اختيار فئة المنتج'); return; }
 
     setLoading(true);
@@ -145,7 +159,7 @@ export default function AddProductScreen({ navigation, route }) {
               <TextInput
                 style={styles.input}
                 value={price}
-                onChangeText={setPrice}
+                onChangeText={handlePriceChange}
                 placeholder="0"
                 keyboardType="numeric"
                 placeholderTextColor={colors.textMuted}
@@ -158,7 +172,7 @@ export default function AddProductScreen({ navigation, route }) {
               <TextInput
                 style={styles.input}
                 value={prepTime}
-                onChangeText={setPrepTime}
+                onChangeText={handleNumericChange(setPrepTime)}
                 placeholder="20"
                 keyboardType="numeric"
                 placeholderTextColor={colors.textMuted}
@@ -173,7 +187,7 @@ export default function AddProductScreen({ navigation, route }) {
             <TextInput
               style={styles.input}
               value={quantity}
-              onChangeText={setQuantity}
+              onChangeText={handleNumericChange(setQuantity)}
               placeholder="10"
               keyboardType="numeric"
               placeholderTextColor={colors.textMuted}

@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import LoadingScreen from '../../components/LoadingScreen';
 
 function StarRow({ rating }) {
   return (
@@ -101,13 +102,7 @@ export default function SellerProfileScreen({ navigation, route }) {
     }
   };
 
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
   if (!seller) return null;
 
