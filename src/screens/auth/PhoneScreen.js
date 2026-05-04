@@ -5,23 +5,36 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
+import { supabase } from '../../lib/supabase';
 
 export default function PhoneScreen({ navigation }) {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (phone.length < 10) {
       setError('برجاء إدخال رقم هاتف صحيح');
       return;
     }
     setError('');
     setLoading(true);
-    setTimeout(() => {
+
+    const formattedPhone = phone.startsWith('0') ? '+2' + phone : '+20' + phone;
+
+    try {
+      const { error: authError } = await supabase.auth.signInWithOtp({ phone: formattedPhone });
+
+      if (authError) {
+        setError(authError.message);
+      } else {
+        navigation.navigate('OTP', { phone: formattedPhone });
+      }
+    } catch (err) {
+      setError('حدث خطأ ما، يرجى المحاولة مرة أخرى');
+    } finally {
       setLoading(false);
-      navigation.navigate('OTP', { phone: '0' + phone });
-    }, 800);
+    }
   };
 
   const formatPhone = (text) => {
@@ -73,13 +86,6 @@ export default function PhoneScreen({ navigation }) {
             />
           </View>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        </View>
-
-        <View style={styles.infoBox}>
-          <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
-          <Text style={styles.infoText}>
-            الكود التجريبي هو: <Text style={styles.bold}>1234</Text>
-          </Text>
         </View>
 
         <TouchableOpacity
@@ -222,24 +228,6 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 6,
   },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FFF0E8',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 32,
-    justifyContent: 'center',
-  },
-  infoText: {
-    fontSize: 13,
-    color: colors.primary,
-    textAlign: 'center',
-  },
-  bold: {
-    fontWeight: 'bold',
-  },
   button: {
     backgroundColor: colors.primary,
     borderRadius: 30,
@@ -254,6 +242,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
     marginBottom: 24,
+    marginTop: 40,
   },
   buttonDisabled: {
     opacity: 0.7,

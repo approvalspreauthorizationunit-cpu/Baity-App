@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, StatusBar, Alert
+  TextInput, StatusBar, Alert, ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
+import { supabase } from '../../lib/supabase';
 
 const timeSlots = [
   'في أقرب وقت ممكن', 'بعد 30 دقيقة', 'بعد ساعة', 'بعد ساعتين',
@@ -15,49 +16,106 @@ const timeSlots = [
 
 export default function CheckoutScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { cart, user, placeOrder, getCartTotal, sellers } = useApp();
+  const { cart, user, clearCart, getCartTotal } = useApp();
   const [selectedAddress, setSelectedAddress] = useState(user?.addresses?.[0] || null);
   const [notes, setNotes] = useState('');
   const [selectedTime, setSelectedTime] = useState(timeSlots[0]);
   const [loading, setLoading] = useState(false);
+  const [calculating, setCalculating] = useState(true);
+  const [totals, setTotals] = useState({
+    subtotal: getCartTotal(),
+    delivery_fee: 0,
+    total: getCartTotal(),
+    commission_amount: 0,
+    seller_earnings: 0
+  });
 
-  const subtotal = getCartTotal();
-  const deliveryFee = 10;
-  const donationAmount = cart.isMealDonation ? 0 : cart.donation;
-  const grandTotal = subtotal + deliveryFee + donationAmount;
-  const seller = sellers.find(s => s.id === cart.sellerId);
+  useEffect(() => {
+    calculateTotals();
+  }, []);
 
-  const handlePlaceOrder = () => {
+  const calculateTotals = async () => {
+    setCalculating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        'calculate-order-totals',
+        {
+          body: {
+            seller_id: cart.sellerId,
+            region_id: user.region_id,
+            subtotal: getCartTotal()
+          }
+        }
+      );
+
+      if (error) throw error;
+      setTotals(data);
+    } catch (err) {
+      console.error('Error calculating totals:', err);
+      // Fallback or alert
+    } finally {
+      setCalculating(false);
+    }
+  };
+
+  const handlePlaceOrder = async () => {
     if (!selectedAddress) {
       Alert.alert('تنبيه', 'برجاء اختيار عنوان التوصيل');
       return;
     }
+
     setLoading(true);
-    setTimeout(() => {
-      const order = {
-        customerId: user.id || 'u1',
-        sellerId: cart.sellerId,
-        sellerName: cart.sellerName,
-        items: cart.items.map(i => ({
-          productId: i.id,
-          name: i.name,
-          price: i.price,
-          quantity: i.quantity,
-        })),
-        total: subtotal,
-        deliveryFee,
-        donation: cart.donation,
-        isMealDonation: cart.isMealDonation,
-        grandTotal,
-        address: selectedAddress.address,
-        notes,
-        deliveryTime: selectedTime,
-      };
-      placeOrder(order);
+    try {
+      // 1. Create order
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          customer_id: user.id,
+          seller_id: cart.sellerId,
+          status: 'pending',
+          total_amount: totals.total,
+          delivery_fee: totals.delivery_fee,
+          commission_amount: totals.commission_amount,
+          seller_earnings: totals.seller_earnings,
+          delivery_address: selectedAddress.address,
+          scheduled_time: selectedTime,
+          donation_amount: cart.donation,
+          donation_type: cart.isMealDonation ? 'meal' : (cart.donation > 0 ? 'money' : null),
+          notes: notes
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // 2. Insert items
+      const orderItems = cart.items.map(item => ({
+        order_id: order.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // 3. Clear cart and navigate
+      clearCart();
+      navigation.replace('OrderTracking', { orderId: order.id });
+
+    } catch (err) {
+      console.error('Place order error:', err);
+      Alert.alert('خطأ', 'حدث خطأ في تأكيد الطلب، يرجى المحاولة مرة أخرى');
+    } finally {
       setLoading(false);
-      navigation.replace('OrderTracking', { orderId: 'latest' });
-    }, 1200);
+    }
   };
+
+  const donationAmount = cart.isMealDonation ? 0 : cart.donation;
+  const finalGrandTotal = totals.total + donationAmount;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -169,7 +227,11 @@ export default function CheckoutScreen({ navigation }) {
           <View style={styles.divider} />
           <View style={styles.orderItem}>
             <Text style={styles.orderItemLabel}>رسوم التوصيل</Text>
-            <Text style={styles.orderItemPrice}>{deliveryFee} جنيه</Text>
+            {calculating ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={styles.orderItemPrice}>{totals.delivery_fee} جنيه</Text>
+            )}
           </View>
           {donationAmount > 0 && (
             <View style={styles.orderItem}>
@@ -185,7 +247,11 @@ export default function CheckoutScreen({ navigation }) {
           )}
           <View style={[styles.orderItem, styles.totalRow]}>
             <Text style={styles.totalLabel}>الإجمالي</Text>
-            <Text style={styles.totalValue}>{grandTotal} جنيه</Text>
+            {calculating ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={styles.totalValue}>{finalGrandTotal} جنيه</Text>
+            )}
           </View>
         </View>
 
@@ -195,9 +261,9 @@ export default function CheckoutScreen({ navigation }) {
       {/* Place Order Button */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 8 }]}>
         <TouchableOpacity
-          style={[styles.orderBtn, loading && styles.orderBtnLoading]}
+          style={[styles.orderBtn, (loading || calculating) && styles.orderBtnLoading]}
           onPress={handlePlaceOrder}
-          disabled={loading}
+          disabled={loading || calculating}
           activeOpacity={0.85}
         >
           {loading ? (
@@ -205,7 +271,7 @@ export default function CheckoutScreen({ navigation }) {
           ) : (
             <>
               <Text style={styles.orderBtnText}>تأكيد الطلب</Text>
-              <Text style={styles.orderBtnTotal}>{grandTotal} جنيه</Text>
+              <Text style={styles.orderBtnTotal}>{finalGrandTotal} جنيه</Text>
             </>
           )}
         </TouchableOpacity>

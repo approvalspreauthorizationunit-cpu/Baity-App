@@ -1,23 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar, Alert, Switch
+  View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar, Alert, Switch, ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
+import { supabase } from '../../lib/supabase';
 
 export default function SellerProductsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user, sellers, deleteProduct, toggleProductAvailability } = useApp();
+  const { user } = useApp();
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('الكل');
 
-  const myProfile = sellers.find(s => s.id === user?.sellerProfile?.sellerId) || sellers[0];
-  const products = myProfile?.products || [];
-  const categories = ['الكل', ...new Set(products.map(p => p.category))];
+  useEffect(() => {
+    loadProducts();
+  }, []);
 
-  const filteredProducts = filter === 'الكل' ? products : products.filter(p => p.category === filter);
-  const availableCount = products.filter(p => p.available).length;
+  const loadProducts = async () => {
+    setLoading(true);
+    try {
+      // 1. Get seller profile id
+      const { data: profile } = await supabase
+        .from('seller_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile) return;
+
+      // 2. Load products
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('seller_id', profile.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (err) {
+      console.error('Error loading products:', err.message);
+      Alert.alert('خطأ', 'تعذر تحميل المنتجات');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleAvailability = async (productId, currentValue) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_available: !currentValue })
+        .eq('id', productId);
+
+      if (error) throw error;
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_available: !currentValue } : p));
+    } catch (err) {
+      Alert.alert('خطأ', 'تعذر تحديث الحالة');
+    }
+  };
 
   const handleDelete = (productId, name) => {
     Alert.alert(
@@ -28,14 +71,30 @@ export default function SellerProductsScreen({ navigation }) {
         {
           text: 'حذف',
           style: 'destructive',
-          onPress: () => deleteProduct(myProfile.id, productId),
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('products')
+                .delete()
+                .eq('id', productId);
+
+              if (error) throw error;
+              setProducts(prev => prev.filter(p => p.id !== productId));
+            } catch (err) {
+              Alert.alert('خطأ', 'تعذر حذف المنتج');
+            }
+          },
         },
       ]
     );
   };
 
+  const categories = ['الكل', ...new Set(products.map(p => p.category))];
+  const filteredProducts = filter === 'الكل' ? products : products.filter(p => p.category === filter);
+  const availableCount = products.filter(p => p.is_available).length;
+
   const renderProduct = ({ item: product }) => (
-    <View style={[styles.productCard, !product.available && styles.productCardInactive]}>
+    <View style={[styles.productCard, !product.is_available && styles.productCardInactive]}>
       <View style={styles.productEmoji}>
         <Ionicons name="fast-food-outline" size={28} color={colors.primary} />
       </View>
@@ -43,10 +102,10 @@ export default function SellerProductsScreen({ navigation }) {
         <View style={styles.productTop}>
           <Text style={styles.productName}>{product.name}</Text>
           <Switch
-            value={product.available}
-            onValueChange={() => toggleProductAvailability(myProfile.id, product.id)}
+            value={product.is_available}
+            onValueChange={() => toggleAvailability(product.id, product.is_available)}
             trackColor={{ false: colors.border, true: colors.success + '60' }}
-            thumbColor={product.available ? colors.success : colors.textMuted}
+            thumbColor={product.is_available ? colors.success : colors.textMuted}
             style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
           />
         </View>
@@ -55,11 +114,7 @@ export default function SellerProductsScreen({ navigation }) {
         <View style={styles.productMeta}>
           <View style={styles.metaItem}>
             <Ionicons name="time-outline" size={12} color={colors.textLight} />
-            <Text style={styles.metaText}>{product.prepTime} دقيقة</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Ionicons name="layers-outline" size={12} color={colors.textLight} />
-            <Text style={styles.metaText}>الكمية: {product.quantity}</Text>
+            <Text style={styles.metaText}>{product.prep_time || 20} دقيقة</Text>
           </View>
           <Text style={styles.price}>{product.price} جنيه</Text>
         </View>
@@ -67,7 +122,7 @@ export default function SellerProductsScreen({ navigation }) {
       <View style={styles.actions}>
         <TouchableOpacity
           style={styles.editBtn}
-          onPress={() => navigation.navigate('AddProduct', { product, sellerId: myProfile.id })}
+          onPress={() => navigation.navigate('AddProduct', { product, onSave: loadProducts })}
         >
           <Ionicons name="pencil-outline" size={16} color={colors.primary} />
         </TouchableOpacity>
@@ -87,7 +142,7 @@ export default function SellerProductsScreen({ navigation }) {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.addBtn}
-          onPress={() => navigation.navigate('AddProduct', { sellerId: myProfile?.id })}
+          onPress={() => navigation.navigate('AddProduct', { onSave: loadProducts })}
         >
           <Ionicons name="add" size={20} color={colors.white} />
           <Text style={styles.addBtnText}>إضافة</Text>
@@ -100,7 +155,7 @@ export default function SellerProductsScreen({ navigation }) {
 
       {/* Category filter */}
       <View style={styles.filterScroll}>
-        <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16 }}>
           {categories.map(cat => (
             <TouchableOpacity
               key={cat}
@@ -110,16 +165,20 @@ export default function SellerProductsScreen({ navigation }) {
               <Text style={[styles.filterText, filter === cat && styles.filterTextActive]}>{cat}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       </View>
 
-      {filteredProducts.length === 0 ? (
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : filteredProducts.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="fast-food-outline" size={64} color={colors.textLight} />
           <Text style={styles.emptyTitle}>لا توجد منتجات</Text>
           <TouchableOpacity
             style={styles.emptyAddBtn}
-            onPress={() => navigation.navigate('AddProduct', { sellerId: myProfile?.id })}
+            onPress={() => navigation.navigate('AddProduct', { onSave: loadProducts })}
           >
             <Text style={styles.emptyAddBtnText}>أضيفي منتجك الأول</Text>
           </TouchableOpacity>
@@ -131,6 +190,8 @@ export default function SellerProductsScreen({ navigation }) {
           renderItem={renderProduct}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onRefresh={loadProducts}
+          refreshing={loading}
         />
       )}
     </View>
@@ -139,6 +200,7 @@ export default function SellerProductsScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12,

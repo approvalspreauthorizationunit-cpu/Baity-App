@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  StatusBar, FlatList, Alert
+  StatusBar, ActivityIndicator, Alert
 } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
+import { supabase } from '../../lib/supabase';
+import LoadingScreen from '../../components/LoadingScreen';
 
 function StarRow({ rating }) {
   return (
@@ -25,17 +27,89 @@ function StarRow({ rating }) {
 
 export default function SellerProfileScreen({ navigation, route }) {
   const { sellerId } = route.params;
-  const { sellers, cart, addToCart, removeFromCart } = useApp();
+  const { cart, addToCart, removeFromCart } = useApp();
   const insets = useSafeAreaInsets();
+  const [seller, setSeller] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [ratings, setRatings] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('الكل');
 
-  const seller = sellers.find(s => s.id === sellerId);
+  useEffect(() => {
+    loadSellerData();
+  }, [sellerId]);
+
+  const loadSellerData = async () => {
+    setLoading(true);
+    try {
+      const { data: sellerData, error: sellerError } = await supabase
+        .from('seller_profiles')
+        .select(`
+          *,
+          users (full_name, avatar_url),
+          ratings (score)
+        `)
+        .eq('id', sellerId)
+        .single();
+
+      if (sellerError) throw sellerError;
+
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('seller_id', sellerId)
+        .eq('is_available', true);
+
+      if (productsError) throw productsError;
+
+      const { data: ratingsData } = await supabase
+        .from('ratings')
+        .select(`
+          score, comment, created_at,
+          users (full_name)
+        `)
+        .eq('seller_id', sellerId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      const totalScore = sellerData.ratings?.reduce((sum, r) => sum + r.score, 0) || 0;
+      const reviewCount = sellerData.ratings?.length || 0;
+      const avgRating = reviewCount > 0 ? (totalScore / reviewCount).toFixed(1) : 'جديد';
+
+      const mappedSeller = {
+        ...sellerData,
+        name: sellerData.kitchen_name || sellerData.users?.full_name || 'بائعة',
+        image: sellerData.users?.avatar_url,
+        specialty: sellerData.bio || 'أكل بيتي',
+        rating: avgRating,
+        reviewCount: reviewCount,
+        distance: 0.8, // Placeholder
+        priceRange: '15-100', // Placeholder
+        isOnline: sellerData.is_available,
+        address: sellerData.address || 'القاهرة',
+        workingHours: sellerData.working_hours ? { from: sellerData.working_hours.split(' - ')[0], to: sellerData.working_hours.split(' - ')[1] } : { from: '9:00', to: '21:00' },
+        totalOrders: 0 // Placeholder
+      };
+
+      setSeller(mappedSeller);
+      setProducts(productsData || []);
+      setRatings(ratingsData || []);
+    } catch (err) {
+      console.error('Error loading seller data:', err.message);
+      Alert.alert('خطأ', 'تعذر تحميل بيانات البائعة');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <LoadingScreen />;
+
   if (!seller) return null;
 
-  const categories = ['الكل', ...new Set(seller.products.map(p => p.category))];
+  const categories = ['الكل', ...new Set(products.map(p => p.category))];
   const filteredProducts = selectedCategory === 'الكل'
-    ? seller.products
-    : seller.products.filter(p => p.category === selectedCategory);
+    ? products
+    : products.filter(p => p.category === selectedCategory);
 
   const getItemQty = (productId) => {
     const item = cart.items.find(i => i.id === productId);
@@ -143,20 +217,37 @@ export default function SellerProfileScreen({ navigation, route }) {
           ))}
         </ScrollView>
 
+        {/* Ratings Section */}
+        {ratings.length > 0 && (
+          <View style={styles.ratingsSection}>
+            <Text style={styles.sectionTitle}>التقييمات ({seller.reviewCount})</Text>
+            {ratings.map((review, i) => (
+              <View key={i} style={styles.reviewCard}>
+                <View style={styles.reviewHeader}>
+                  <Text style={styles.reviewerName}>{review.users?.full_name}</Text>
+                  <StarRow rating={review.score} />
+                </View>
+                {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
+                <Text style={styles.reviewDate}>{new Date(review.created_at).toLocaleDateString('ar-EG')}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Products */}
         <View style={styles.productsSection}>
           <Text style={styles.sectionTitle}>القائمة ({filteredProducts.length} صنف)</Text>
           {filteredProducts.map(product => {
             const qty = getItemQty(product.id);
             return (
-              <View key={product.id} style={[styles.productCard, !product.available && styles.productUnavailable]}>
+              <View key={product.id} style={[styles.productCard, !product.is_available && styles.productUnavailable]}>
                 <View style={styles.productEmoji}>
                   <Ionicons name="fast-food-outline" size={32} color={colors.primary} />
                 </View>
                 <View style={styles.productInfo}>
                   <View style={styles.productHeader}>
                     <Text style={styles.productName}>{product.name}</Text>
-                    {!product.available && (
+                    {!product.is_available && (
                       <View style={styles.unavailableBadge}>
                         <Text style={styles.unavailableText}>غير متاح</Text>
                       </View>
@@ -168,10 +259,10 @@ export default function SellerProfileScreen({ navigation, route }) {
                       <Text style={styles.price}>{product.price} جنيه</Text>
                       <View style={styles.prepTime}>
                         <Ionicons name="time-outline" size={12} color={colors.textLight} />
-                        <Text style={styles.prepTimeText}>{product.prepTime} د</Text>
+                        <Text style={styles.prepTimeText}>{product.prep_time || 20} د</Text>
                       </View>
                     </View>
-                    {product.available && (
+                    {product.is_available && (
                       qty === 0 ? (
                         <TouchableOpacity style={styles.addBtn} onPress={() => handleAddToCart(product)}>
                           <Ionicons name="add" size={20} color={colors.white} />
@@ -217,6 +308,7 @@ export default function SellerProfileScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  center: { alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.white,
@@ -228,7 +320,6 @@ const styles = StyleSheet.create({
     height: 160, backgroundColor: '#FFE8DC', alignItems: 'center', justifyContent: 'center',
     position: 'relative',
   },
-  heroEmoji: { fontSize: 64 },
   onlineBadge: {
     position: 'absolute', top: 12, right: 12,
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -245,7 +336,6 @@ const styles = StyleSheet.create({
     width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFE8DC',
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarEmoji: { fontSize: 32 },
   infoText: { flex: 1, gap: 4 },
   sellerName: { fontSize: 18, fontWeight: 'bold', color: colors.text, textAlign: 'right' },
   specialty: { fontSize: 13, color: colors.textLight, textAlign: 'right' },
@@ -285,6 +375,12 @@ const styles = StyleSheet.create({
   unavailableText: { fontSize: 10, color: colors.white },
   productDesc: { fontSize: 12, color: colors.textLight, lineHeight: 18, textAlign: 'right', marginBottom: 8 },
   productFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  ratingsSection: { paddingHorizontal: 12, marginBottom: 20 },
+  reviewCard: { backgroundColor: colors.white, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border },
+  reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  reviewerName: { fontSize: 13, fontWeight: 'bold' },
+  reviewComment: { fontSize: 12, color: colors.text, textAlign: 'right', marginBottom: 4 },
+  reviewDate: { fontSize: 10, color: colors.textLight, textAlign: 'right' },
   productMeta: { gap: 4 },
   price: { fontSize: 16, fontWeight: 'bold', color: colors.primary },
   prepTime: { flexDirection: 'row', alignItems: 'center', gap: 3 },

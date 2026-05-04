@@ -6,7 +6,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
-import { donationOptions } from '../../data/mockData';
+
+const donationOptions = [
+  { id: 'd1', label: '5 جنيه', amount: 5 },
+  { id: 'd2', label: '10 جنيه', amount: 10 },
+  { id: 'd3', label: '20 جنيه', amount: 20 },
+  { id: 'meal', label: 'وجبة مجانية', amount: 0, isMeal: true },
+];
 
 export default function CartScreen({ navigation }) {
   const insets = useSafeAreaInsets();
