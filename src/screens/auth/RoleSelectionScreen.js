@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, Animated
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
-import { mockUser } from '../../data/mockData';
+import { supabase } from '../../lib/supabase';
 
 export default function RoleSelectionScreen({ navigation, route }) {
-  const { phone } = route.params;
+  const { userId, phone } = route.params;
   const { login } = useApp();
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -19,16 +19,53 @@ export default function RoleSelectionScreen({ navigation, route }) {
     setSelected(role);
     setLoading(true);
 
-    const userData = {
-      ...mockUser,
-      phone,
-      role,
-      mode: role === 'seller' ? 'seller' : 'customer',
-    };
+    try {
+      // 1. Create user profile in Supabase
+      const { data: newProfile, error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          phone: phone,
+          role: role,
+          is_active: true
+        })
+        .select()
+        .single();
 
-    setTimeout(async () => {
-      await login(userData);
-    }, 600);
+      if (profileError) {
+        Alert.alert('خطأ', 'تعذر إنشاء الحساب، يرجى المحاولة لاحقاً');
+        setLoading(false);
+        return;
+      }
+
+      // 2. If role is seller, create seller_profiles record
+      if (role === 'seller') {
+        const { error: sellerError } = await supabase
+          .from('seller_profiles')
+          .insert({
+            user_id: userId,
+            status: 'pending'
+          });
+
+        if (sellerError) {
+          console.error('Error creating seller profile:', sellerError.message);
+        }
+      }
+
+      // 3. Update App Context
+      await login(newProfile);
+
+      // 4. Navigation
+      if (role === 'seller') {
+        navigation.navigate('SellerSetup');
+      } else {
+        navigation.navigate('CustomerRoot');
+      }
+
+    } catch (err) {
+      Alert.alert('خطأ', 'حدث خطأ غير متوقع');
+      setLoading(false);
+    }
   };
 
   return (
@@ -56,7 +93,7 @@ export default function RoleSelectionScreen({ navigation, route }) {
             colors={selected === 'customer' ? ['#FF8C5A', colors.primary] : ['#FFF8F5', '#FFF0E8']}
             style={styles.cardGradient}
           >
-            <Ionicons name="bag-handle-outline" size={48} color={selected === 'customer' ? '#fff' : colors.primary} style={styles.cardEmoji} />
+            <Ionicons name="bag-handle-outline" size={48} color={selected === 'customer' ? '#fff' : colors.primary} />
             <Text style={[styles.cardTitle, selected === 'customer' && styles.cardTitleSelected]}>
               أنا عميل
             </Text>
@@ -93,7 +130,7 @@ export default function RoleSelectionScreen({ navigation, route }) {
             colors={selected === 'seller' ? ['#FF8C5A', colors.primary] : ['#FFF8F5', '#FFF0E8']}
             style={styles.cardGradient}
           >
-            <Ionicons name="restaurant-outline" size={48} color={selected === 'seller' ? '#fff' : colors.primary} style={styles.cardEmoji} />
+            <Ionicons name="restaurant-outline" size={48} color={selected === 'seller' ? '#fff' : colors.primary} />
             <Text style={[styles.cardTitle, selected === 'seller' && styles.cardTitleSelected]}>
               أنا ربة منزل
             </Text>
@@ -133,10 +170,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 32,
-  },
-  emoji: {
-    fontSize: 48,
-    marginBottom: 12,
   },
   title: {
     fontSize: 26,
@@ -179,10 +212,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  cardEmoji: {
-    fontSize: 52,
-    marginBottom: 12,
-  },
   cardTitle: {
     fontSize: 22,
     fontWeight: 'bold',
@@ -207,7 +236,6 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: 6,
   },
-  cardFeaturesSelected: {},
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',

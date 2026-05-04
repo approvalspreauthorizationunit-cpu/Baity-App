@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { mockSellers, mockOrders, mockUser } from '../data/mockData';
+import { supabase } from '../lib/supabase';
 
 const AppContext = createContext();
 
@@ -8,7 +8,7 @@ const initialState = {
   isLoading: true,
   isLoggedIn: false,
   user: null,
-  sellers: mockSellers,
+  sellers: [],
   cart: {
     items: [],
     sellerId: null,
@@ -16,7 +16,7 @@ const initialState = {
     donation: 0,
     isMealDonation: false,
   },
-  orders: mockOrders,
+  orders: [],
 };
 
 function appReducer(state, action) {
@@ -253,32 +253,49 @@ function appReducer(state, action) {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  useEffect(() => {
-    loadStoredData();
-  }, []);
-
   const loadStoredData = async () => {
     try {
-      const storedUser = await AsyncStorage.getItem('user');
-      if (storedUser) {
-        dispatch({ type: 'LOGIN', payload: JSON.parse(storedUser) });
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+        if (profile) {
+          dispatch({ type: 'LOGIN', payload: { ...profile, supabaseUser: session.user } })
+        } else {
+          dispatch({ type: 'SET_LOADING', payload: false })
+        }
       } else {
-        dispatch({ type: 'SET_LOADING', payload: false });
+        dispatch({ type: 'SET_LOADING', payload: false })
       }
     } catch (e) {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: 'SET_LOADING', payload: false })
     }
-  };
+  }
+
+  useEffect(() => {
+    loadStoredData()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_OUT') {
+          dispatch({ type: 'LOGOUT' })
+        }
+      }
+    )
+    return () => subscription.unsubscribe()
+  }, [])
 
   const login = async (userData) => {
-    await AsyncStorage.setItem('user', JSON.stringify(userData));
-    dispatch({ type: 'LOGIN', payload: userData });
-  };
+    dispatch({ type: 'LOGIN', payload: userData })
+  }
 
   const logout = async () => {
-    await AsyncStorage.removeItem('user');
-    dispatch({ type: 'LOGOUT' });
-  };
+    await supabase.auth.signOut()
+    dispatch({ type: 'LOGOUT' })
+  }
 
   const switchMode = (mode) => {
     const updatedUser = { ...state.user, mode };

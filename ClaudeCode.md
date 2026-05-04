@@ -52,9 +52,13 @@ Stored in .env.local (never hardcoded)
 | 2026-05-02 | Project Review and Overview | ✅ Done |
 | 2026-05-04 | Full Supabase setup: tables, RLS, storage, realtime, migrations | ✅ Done |
 | 2026-05-04 | Develop and Deploy Edge Functions | ✅ Done |
+| 2026-05-04 | Supabase Auth integration (Phone OTP & Admin Password) | ✅ Done |
+| 2026-05-04 | Removed all mock authentication logic | ✅ Done |
+| 2026-05-04 | Admin seeded in database (admin@baiti.app) | ✅ Done |
 
 ## Pending Tasks
-- Replace all mock data in React Native screens with real Supabase queries
+- Load real sellers from Supabase in CustomerHomeScreen
+- Load real orders from Supabase in OrderHistoryScreen and SellerOrdersScreen
 - Build seller registration flow with document upload
 - Connect order tracking to Supabase Realtime
 - Build admin dashboard with Supabase integration
@@ -70,7 +74,7 @@ Stored in .env.local (never hardcoded)
 - Special requests are visible only to approved sellers in the same region
 
 ## Notes & Decisions
-- **Secure Credentials**: All keys are strictly managed via environment variables and `.env.local`.
-- **Deployment Strategy**: Replaced Docker-based deployment with a custom Node.js script using the Supabase Management API to bypass sandbox limitations.
-- **Automation**: Created `scripts/deploy-supabase-functions.js` for programmatic deployment and `scripts/deploy-functions.sh` as a shell-based fallback.
-- **Database Logic**: RPC functions for wallet management were successfully applied via CLI migrations.
+- **Supabase Auth**: Implemented international phone number formatting (+20) for SMS OTP.
+- **Persistence**: Switched from custom `AsyncStorage` login persistence to Supabase's native persistence mechanism using `AsyncStorage` as the storage provider.
+- **Role Enforcement**: User role is verified against the `users` table after every login/verification to ensure proper access control.
+- **Admin Seeding**: Created `scripts/seed-admin.js` to initialize the platform with administrative access.

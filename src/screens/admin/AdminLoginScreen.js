@@ -6,9 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
-
-const ADMIN_EMAIL = 'admin@beiti.com';
-const ADMIN_PASSWORD = 'admin123';
+import { supabase } from '../../lib/supabase';
 
 export default function AdminLoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -17,21 +15,48 @@ export default function AdminLoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       setError('برجاء إدخال البريد الإلكتروني وكلمة المرور');
       return;
     }
     setLoading(true);
     setError('');
-    setTimeout(() => {
-      setLoading(false);
-      if (email.trim() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-        navigation.replace('AdminDashboard');
-      } else {
+
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password
+      });
+
+      if (authError) {
         setError('بيانات الدخول غير صحيحة');
+        setLoading(false);
+        return;
       }
-    }, 800);
+
+      if (data.user) {
+        // Verify admin role
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError || profile?.role !== 'admin') {
+          setError('غير مصرح بالدخول');
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
+
+        navigation.replace('AdminDashboard');
+      }
+    } catch (err) {
+      setError('حدث خطأ في الاتصال، حاول مرة أخرى');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -62,7 +87,7 @@ export default function AdminLoginScreen({ navigation }) {
                 style={styles.input}
                 value={email}
                 onChangeText={setEmail}
-                placeholder="admin@beiti.com"
+                placeholder="admin@baiti.app"
                 placeholderTextColor="#666"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -95,12 +120,6 @@ export default function AdminLoginScreen({ navigation }) {
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
-
-          <View style={styles.demoHint}>
-            <Text style={styles.demoText}>
-              البريد: admin@beiti.com{'\n'}كلمة المرور: admin123
-            </Text>
-          </View>
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
@@ -206,19 +225,6 @@ const styles = StyleSheet.create({
     color: '#ff6b6b',
     fontSize: 13,
     textAlign: 'center',
-  },
-  demoHint: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  demoText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 20,
   },
   button: {
     backgroundColor: colors.primary,
