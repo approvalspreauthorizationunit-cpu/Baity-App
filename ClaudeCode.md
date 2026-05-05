@@ -74,9 +74,10 @@ Stored in .env.local (never hardcoded)
 | 2026-05-05 | Performance optimization (useMemo, useCallback) | ✅ Done |
 | 2026-05-05 | Security audit — seller phone hidden from customers | ✅ Done |
 | 2026-05-05 | Final cleanup — mockData removed, console.logs cleaned | ✅ Done |
-| 2026-05-04 | Admin Dashboard rebuilt with Supabase integration | ✅ Done |
-| 2026-05-04 | Seller registration flow with multi-step form | ✅ Done |
-| 2026-05-04 | Full Supabase setup: tables, RLS, storage, realtime, migrations | ✅ Done |
+| 2026-05-05 | EAS Build configuration and preview profile set up | ✅ Done |
+| 2026-05-05 | Hardened User RLS (prevent role self-promotion) | ✅ Done |
+| 2026-05-05 | Implemented Storage RLS policies for all buckets | ✅ Done |
+| 2026-05-05 | Removed administrative secrets from build configuration | ✅ Done |
 
 ## Pending Tasks
 - Build Admin Dashboard as separate web page
@@ -101,5 +102,14 @@ Stored in .env.local (never hardcoded)
 - **Expo Go**: Setup for immediate testing during development using dynamic app.config.js.
 - **App Readiness**: The app is production-ready for initial launch with all mock data removed.
 - **Error Handling**: Error boundaries protect all user flows, and global loading/empty states provide consistent UX.
-- **Offer Acceptance**: Accepting an offer automatically closes the request, rejects all other offers, and creates a real order.
+- **Security**: Seller phone numbers are confirmed hidden from all customer-facing screens. Hardened database RLS to prevent users from changing their own roles or status. Implemented strict folder-level RLS for Supabase Storage.
+- **Special Requests**: Implemented a bidding system where customers post requests and sellers in the same region submit offers. Realtime is used to notify sellers of new requests and customers of new offers.
+- **Offer Acceptance**: Accepting an offer automatically closes the request, rejects all other offers, and creates a real order in the `orders` table.
+- **Seller Ratings**: Implemented dynamic average rating calculation from the `ratings` table, displayed on Home, Profile, and Offer cards.
+- **Database Integrity**: Added unique constraints for special requests and offers to prevent duplicate data during seeding and app usage.
 - **Supabase Auth**: Implemented international phone number formatting (+20) for SMS OTP.
+- **Data Integration**: Successfully replaced all major mock data flows with real-time Supabase queries.
+- **Seller Registration**: Implemented a 3-step registration flow including document upload to Supabase Storage.
+- **Routing**: Added logic in `AppNavigator` and `AppContext` to route sellers to `SellerPendingScreen` if their application is not yet approved.
+- **Notifications**: Added a health certificate expiry banner in the Seller Dashboard to alert users 30 days before expiration.
+- **EAS Build**: Standardized project for Expo SDK 54. Configured `eas.json` for Android APK previews. Build attempt reached free tier limit for the month, but config is verified and ready for local or priority builds.
