@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import VerifiedBadge from '../../components/VerifiedBadge';
 
 const orderStatusLabels = {
   pending: 'تم استلام الطلب',
@@ -68,7 +69,7 @@ export default function OrderTrackingScreen({ navigation, route }) {
         .from('orders')
         .select(`
           *,
-          seller_profiles (kitchen_name, working_hours),
+          seller_profiles (kitchen_name, is_verified, working_hours),
           order_items (quantity, unit_price, products(name)),
           ratings (id)
         `)
@@ -241,7 +242,10 @@ export default function OrderTrackingScreen({ navigation, route }) {
           <View style={styles.detailRow}>
             <Ionicons name="storefront-outline" size={16} color={colors.primary} />
             <Text style={styles.detailLabel}>البائعة</Text>
-            <Text style={styles.detailValue}>{order.seller_profiles?.kitchen_name}</Text>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
+              <Text style={styles.detailValue}>{order.seller_profiles?.kitchen_name}</Text>
+              {order.seller_profiles?.is_verified && <VerifiedBadge size={14} />}
+            </View>
           </View>
           <View style={styles.detailRow}>
             <Ionicons name="location-outline" size={16} color={colors.primary} />

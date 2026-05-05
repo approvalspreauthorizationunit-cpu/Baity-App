@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import VerifiedBadge from '../../components/VerifiedBadge';
 
 const TABS = ['نظرة عامة', 'البائعون', 'الإعدادات', 'السحوبات', 'الطلبات'];
 const SELLER_FILTERS = [
@@ -17,7 +18,7 @@ const SELLER_FILTERS = [
 ];
 
 export default function AdminDashboardScreen({ navigation }) {
-  const { logout } = useApp();
+  const { logout, user: adminUser } = useApp();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ revenue: 0, activeSellers: 0, pendingSellers: 0, todayOrders: 0, pendingWithdrawals: 0 });
@@ -218,7 +219,10 @@ export default function AdminDashboardScreen({ navigation }) {
       {sellers.map(seller => (
         <TouchableOpacity key={seller.id} style={styles.sellerCard} onPress={() => { setSelectedSeller(seller); setShowSellerModal(true); }}>
           <View style={styles.sellerHeader}>
-            <Text style={styles.kitchenName}>{seller.kitchen_name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.kitchenName}>{seller.kitchen_name}</Text>
+              {seller.is_verified && <VerifiedBadge size={14} />}
+            </View>
             <View style={[styles.statusBadge, { backgroundColor: statusColors[seller.status] + '20' }]}>
               <Text style={[styles.statusText, { color: statusColors[seller.status] }]}>{seller.status}</Text>
             </View>
@@ -422,6 +426,80 @@ export default function AdminDashboardScreen({ navigation }) {
                    }}
                  />
                </View>
+
+               <Text style={styles.sectionTitle}>التوثيق</Text>
+               <View style={styles.verificationSection}>
+                 {selectedSeller.is_verified ? (
+                   <View style={styles.verifiedStatus}>
+                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
+                       <VerifiedBadge size={20} />
+                       <Text style={styles.verifiedText}>موثق</Text>
+                     </View>
+                     <Text style={styles.verifiedDate}>بتاريخ: {new Date(selectedSeller.verified_at).toLocaleDateString('ar-EG')}</Text>
+                     <TouchableOpacity
+                       style={[styles.actionBtn, { backgroundColor: colors.error, marginTop: 12 }]}
+                       onPress={() => {
+                         Alert.alert(
+                           'تأكيد',
+                           'هل تريد إلغاء توثيق هذا البائع؟',
+                           [
+                             { text: 'إلغاء', style: 'cancel' },
+                             { text: 'تأكيد', onPress: async () => {
+                               const { error } = await supabase
+                                 .from('seller_profiles')
+                                 .update({
+                                   is_verified: false,
+                                   verified_at: null,
+                                   verified_by: null
+                                 })
+                                 .eq('id', selectedSeller.id);
+                               if (!error) {
+                                 setSelectedSeller({ ...selectedSeller, is_verified: false });
+                                 loadSellers();
+                               }
+                             }}
+                           ]
+                         );
+                       }}
+                     >
+                       <Text style={styles.actionBtnText}>إلغاء التوثيق</Text>
+                     </TouchableOpacity>
+                   </View>
+                 ) : (
+                   <View style={styles.unverifiedStatus}>
+                     <Text style={styles.unverifiedText}>غير موثق</Text>
+                     <TouchableOpacity
+                       style={[styles.actionBtn, { backgroundColor: '#1D9BF0', marginTop: 12 }]}
+                       onPress={() => {
+                         Alert.alert(
+                           'تأكيد',
+                           'هل تريد منح علامة التوثيق لهذا البائع؟',
+                           [
+                             { text: 'إلغاء', style: 'cancel' },
+                             { text: 'تأكيد', onPress: async () => {
+                               const { error } = await supabase
+                                 .from('seller_profiles')
+                                 .update({
+                                   is_verified: true,
+                                   verified_at: new Date().toISOString(),
+                                   verified_by: adminUser.id
+                                 })
+                                 .eq('id', selectedSeller.id);
+                               if (!error) {
+                                 setSelectedSeller({ ...selectedSeller, is_verified: true, verified_at: new Date().toISOString() });
+                                 loadSellers();
+                                 Alert.alert('تم', 'تم منح علامة التوثيق بنجاح ✓');
+                               }
+                             }}
+                           ]
+                         );
+                       }}
+                     >
+                       <Text style={styles.actionBtnText}>منح التوثيق ✓</Text>
+                     </TouchableOpacity>
+                   </View>
+                 )}
+               </View>
             </ScrollView>
           </View>
         )}
@@ -570,6 +648,12 @@ const styles = StyleSheet.create({
   docImage: { width: '100%', height: 200, borderRadius: 12, backgroundColor: '#eee' },
   commissionEditRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginTop: 16 },
   commissionInput: { width: 80, backgroundColor: '#f9f9f9', borderRadius: 8, padding: 8, textAlign: 'center', borderWidth: 1, borderColor: '#eee' },
+  verificationSection: { backgroundColor: '#f9f9f9', borderRadius: 12, padding: 16, marginTop: 8 },
+  verifiedStatus: { alignItems: 'flex-end' },
+  verifiedText: { fontSize: 16, fontWeight: 'bold', color: '#1D9BF0', marginLeft: 4 },
+  verifiedDate: { fontSize: 12, color: '#666', marginTop: 4 },
+  unverifiedStatus: { alignItems: 'flex-end' },
+  unverifiedText: { fontSize: 16, fontWeight: 'bold', color: colors.textLight },
   centeredModal: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalBox: { width: '85%', backgroundColor: '#fff', borderRadius: 20, padding: 24, gap: 16 },
   rejectionInput: { backgroundColor: '#f9f9f9', borderRadius: 12, padding: 16, height: 100, textAlignVertical: 'top', textAlign: 'right' },

@@ -10,6 +10,7 @@ import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
 import LoadingScreen from '../../components/LoadingScreen';
 import EmptyState from '../../components/EmptyState';
+import VerifiedBadge from '../../components/VerifiedBadge';
 
 const TABS = ['طلباتي', 'طلب جديد'];
 
@@ -42,6 +43,7 @@ export default function SpecialRequestsScreen({ navigation }) {
             *,
             seller_profiles (
               kitchen_name,
+              is_verified,
               commission_rate,
               users (full_name)
             )
@@ -234,7 +236,10 @@ export default function SpecialRequestsScreen({ navigation }) {
                     <View key={offer.id} style={styles.offerCard}>
                         <View style={styles.offerHeader}>
                             <View>
-                                <Text style={styles.kitchenName}>{offer.seller_profiles.kitchen_name}</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
+                                    <Text style={styles.kitchenName}>{offer.seller_profiles.kitchen_name}</Text>
+                                    {offer.seller_profiles.is_verified && <VerifiedBadge size={14} />}
+                                </View>
                                 <View style={styles.ratingRow}>
                                     <Ionicons name="star" size={12} color={colors.star} />
                                     <Text style={styles.ratingText}>{offer.avgRating}</Text>
