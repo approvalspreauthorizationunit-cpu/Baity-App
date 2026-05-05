@@ -63,7 +63,7 @@ export default function CustomerHomeScreen({ navigation }) {
             rating: avgRating,
             reviewCount: reviewCount,
             distance: 0.8, // Placeholder
-            priceRange: prices.length ? `${minPrice}-${maxPrice}` : '0',
+            priceRange: prices.length ? `${minPrice}-\ ${maxPrice}` : '0',
             isOnline: s.is_available,
             is_verified: s.is_verified,
             image: s.users?.avatar_url
