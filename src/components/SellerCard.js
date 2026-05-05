@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
+import VerifiedBadge from './VerifiedBadge';
 
 const categoryIcon = (cats = []) => {
   const first = cats[0] || '';
@@ -49,7 +50,10 @@ export default function SellerCard({ seller, onPress }) {
       </View>
       <View style={styles.info}>
         <View style={styles.headerRow}>
-          <Text style={styles.name}>{seller.name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <Text style={styles.name}>{seller.kitchen_name || seller.name}</Text>
+            {seller.is_verified && <VerifiedBadge size={16} />}
+          </View>
           <View style={styles.ratingRow}>
             <View style={styles.stars}>{renderStars(seller.rating)}</View>
             <Text style={styles.ratingText}>{seller.rating}</Text>

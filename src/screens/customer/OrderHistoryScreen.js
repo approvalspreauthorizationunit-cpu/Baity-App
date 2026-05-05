@@ -8,6 +8,7 @@ import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
 import EmptyState from '../../components/EmptyState';
+import VerifiedBadge from '../../components/VerifiedBadge';
 
 const statusColors = {
   pending: colors.badge.pending,
@@ -53,7 +54,7 @@ export default function OrderHistoryScreen({ navigation }) {
         .select(`
           *,
           order_items (*, products (name)),
-          seller_profiles (id, kitchen_name, bio)
+          seller_profiles (id, kitchen_name, is_verified, bio)
         `)
         .eq('customer_id', user.id)
         .order('created_at', { ascending: false });
@@ -110,7 +111,10 @@ export default function OrderHistoryScreen({ navigation }) {
             <Ionicons name="storefront-outline" size={24} color={colors.primary} />
           </View>
           <View>
-            <Text style={styles.sellerName}>{order.seller_profiles?.kitchen_name || 'بائعة'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.sellerName}>{order.seller_profiles?.kitchen_name || 'بائعة'}</Text>
+              {order.seller_profiles?.is_verified && <VerifiedBadge size={14} />}
+            </View>
             <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
           </View>
         </View>
