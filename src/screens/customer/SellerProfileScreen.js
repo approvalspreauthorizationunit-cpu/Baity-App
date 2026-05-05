@@ -9,6 +9,7 @@ import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
 import LoadingScreen from '../../components/LoadingScreen';
+import VerifiedBadge from '../../components/VerifiedBadge';
 
 function StarRow({ rating }) {
   return (
@@ -147,7 +148,10 @@ export default function SellerProfileScreen({ navigation, route }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{seller.name}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.headerTitle}>{seller.name}</Text>
+          {seller.is_verified && <VerifiedBadge size={18} />}
+        </View>
         <View style={{ width: 40 }} />
       </View>
 
@@ -168,7 +172,10 @@ export default function SellerProfileScreen({ navigation, route }) {
               <Ionicons name="person-circle-outline" size={40} color={colors.primary} />
             </View>
             <View style={styles.infoText}>
-              <Text style={styles.sellerName}>{seller.name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
+                <Text style={styles.sellerName}>{seller.name}</Text>
+                {seller.is_verified && <VerifiedBadge size={20} />}
+              </View>
               <Text style={styles.specialty}>{seller.specialty}</Text>
               <View style={styles.ratingRow}>
                 <StarRow rating={seller.rating} />

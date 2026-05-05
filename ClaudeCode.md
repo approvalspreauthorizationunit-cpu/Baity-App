@@ -1,5 +1,5 @@
 # Baiti App — Project Log
-_Last updated: 2026-05-04_
+_Last updated: 2026-05-05_
 
 ## Project Overview
 Baiti is a home-cook food delivery platform connecting home-based sellers with customers.
@@ -16,11 +16,12 @@ Stored in .env.local (never hardcoded)
 - EXPO_PUBLIC_SUPABASE_ANON_KEY
 - EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
 - SUPABASE_ACCESS_TOKEN
+- EXPO_PROJECT_ID
 
 ## Database Tables
 - regions
 - users
-- seller_profiles
+- seller_profiles (updated with is_verified, verified_at, verified_by)
 - products
 - orders
 - order_items
@@ -49,40 +50,14 @@ Stored in .env.local (never hardcoded)
 ## Completed Tasks
 | Date | Task | Status |
 |------|------|--------|
-| 2026-05-02 | Project Review and Overview | ✅ Done |
-| 2026-05-04 | Full Supabase setup: tables, RLS, storage, realtime, migrations | ✅ Done |
-| 2026-05-04 | Develop and Deploy Edge Functions | ✅ Done |
-| 2026-05-04 | Supabase Auth integration (Phone OTP & Admin Password) | ✅ Done |
-| 2026-05-04 | Removed all mock authentication logic | ✅ Done |
-| 2026-05-04 | Admin seeded in database (admin@baiti.app) | ✅ Done |
-| 2026-05-04 | Test data seeded (3 regions, 3 sellers, 12 products, 1 customer) | ✅ Done |
-| 2026-05-04 | CustomerHomeScreen connected to Supabase | ✅ Done |
-| 2026-05-04 | SellerProfileScreen connected to Supabase | ✅ Done |
-| 2026-05-04 | SellerProductsScreen connected to Supabase | ✅ Done |
-| 2026-05-04 | AddProductScreen connected to Supabase | ✅ Done |
-| 2026-05-04 | OrderHistoryScreen connected to Supabase | ✅ Done |
-| 2026-05-04 | SellerOrdersScreen connected to Supabase + Realtime | ✅ Done |
-| 2026-05-04 | SellerDashboardScreen connected to Supabase | ✅ Done |
-| 2026-05-04 | Seller registration flow with multi-step form | ✅ Done |
-| 2026-05-04 | Document upload to Supabase Storage (seller-documents bucket) | ✅ Done |
-| 2026-05-04 | SellerPendingScreen for pending/needs_info sellers | ✅ Done |
-| 2026-05-04 | Health certificate expiry alert in SellerDashboard | ✅ Done |
-| 2026-05-04 | Navigation updated for seller status routing | ✅ Done |
-| 2026-05-04 | Admin Dashboard rebuilt with Supabase integration | ✅ Done |
-| 2026-05-04 | Seller application review (approve/reject/needs_info) | ✅ Done |
-| 2026-05-04 | Commission management per seller | ✅ Done |
-| 2026-05-04 | Platform settings management (commission, delivery, min withdrawal) | ✅ Done |
-| 2026-05-04 | Regions management (add/edit/toggle active) | ✅ Done |
-| 2026-05-04 | Withdrawal requests management with Edge Function | ✅ Done |
-| 2026-05-04 | Order monitoring tab in Admin Dashboard | ✅ Done |
-| 2026-05-04 | Admin routing via role-based navigation guards | ✅ Done |
-| 2026-05-04 | Fixed RLS errors using correct Service Role | ✅ Done |
-| 2026-05-04 | CheckoutScreen connected to Supabase with Edge Function for totals | ✅ Done |
-| 2026-05-04 | Real order creation with order_items in Supabase | ✅ Done |
-| 2026-05-04 | OrderTrackingScreen — removed mock timer, connected to Realtime | ✅ Done |
-| 2026-05-04 | Post-delivery rating system implemented | ✅ Done |
-| 2026-05-04 | SellerOrdersScreen — order status updates trigger Edge Function | ✅ Done |
-| 2026-05-04 | SellerWalletScreen — real wallet data, transactions, withdrawal flow | ✅ Done |
+| 2026-05-05 | Seller verification badge feature (blue checkmark #1D9BF0) | ✅ Done |
+| 2026-05-05 | Database migration for is_verified, verified_at, verified_by | ✅ Done |
+| 2026-05-05 | VerifiedBadge component created | ✅ Done |
+| 2026-05-05 | Badge displayed in all customer-facing seller name locations | ✅ Done |
+| 2026-05-05 | Admin can grant/revoke verification from seller details modal | ✅ Done |
+| 2026-05-05 | EAS Update configured for automatic OTA updates | ✅ Done |
+| 2026-05-05 | UPDATE_GUIDE.md created for future update instructions | ✅ Done |
+| 2026-05-05 | Expo Go preview setup and verified | ✅ Done |
 | 2026-05-05 | Special Requests screen for customers (post + view + accept offers) | ✅ Done |
 | 2026-05-05 | Special Requests screen for sellers (view + submit offers) | ✅ Done |
 | 2026-05-05 | Realtime updates for offers and requests in region | ✅ Done |
@@ -105,10 +80,12 @@ Stored in .env.local (never hardcoded)
 | 2026-05-05 | Removed administrative secrets from build configuration | ✅ Done |
 
 ## Pending Tasks
-- Push notifications for new orders (future enhancement)
+- Build Admin Dashboard as separate web page
+- APK build — ready when Expo free tier resets next month
+- Push notifications (future enhancement)
 - Image upload for products (future enhancement)
 - Multi-language support Arabic/English (future enhancement)
-- Remove test/seed data from Supabase Dashboard before launch
+- Remove test/seed data from Supabase before public launch
 
 ## Business Rules
 - Platform commission: 10% default (configurable per seller)
@@ -120,6 +97,9 @@ Stored in .env.local (never hardcoded)
 - Special requests are visible only to approved sellers in the same region
 
 ## Notes & Decisions
+- **Verification Badge**: Uses Twitter/X blue color #1D9BF0. Only admin can grant or revoke verification. verified_at and verified_by recorded for audit trail.
+- **EAS Update**: Channel set to 'preview'. Use this for all code updates. New APK only needed when adding new libraries or changing app config.
+- **Expo Go**: Setup for immediate testing during development using dynamic app.config.js.
 - **App Readiness**: The app is production-ready for initial launch with all mock data removed.
 - **Error Handling**: Error boundaries protect all user flows, and global loading/empty states provide consistent UX.
 - **Security**: Seller phone numbers are confirmed hidden from all customer-facing screens. Hardened database RLS to prevent users from changing their own roles or status. Implemented strict folder-level RLS for Supabase Storage.

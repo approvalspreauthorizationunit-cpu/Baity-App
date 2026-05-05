@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import VerifiedBadge from '../../components/VerifiedBadge';
 
 const TABS = ['نظرة عامة', 'البائعون', 'الإعدادات', 'السحوبات', 'الطلبات'];
 const SELLER_FILTERS = [
@@ -17,7 +18,7 @@ const SELLER_FILTERS = [
 ];
 
 export default function AdminDashboardScreen({ navigation }) {
-  const { logout } = useApp();
+  const { logout, user: adminUser } = useApp();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ revenue: 0, activeSellers: 0, pendingSellers: 0, todayOrders: 0, pendingWithdrawals: 0 });
@@ -87,6 +88,12 @@ export default function AdminDashboardScreen({ navigation }) {
       .eq('status', sellerFilter)
       .order('created_at', { ascending: false });
     setSellers(data || []);
+
+    // Update selected seller if modal is open
+    if (selectedSeller) {
+      const updated = data?.find(s => s.id === selectedSeller.id);
+      if (updated) setSelectedSeller(updated);
+    }
   };
 
   const loadSettings = async () => {
@@ -131,6 +138,72 @@ export default function AdminDashboardScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGrantVerification = async (sellerId) => {
+    Alert.alert(
+      'تأكيد التوثيق',
+      'هل تريد منح علامة التوثيق لهذا البائع؟',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'تأكيد',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const { error } = await supabase
+                .from('seller_profiles')
+                .update({
+                  is_verified: true,
+                  verified_at: new Date().toISOString(),
+                  verified_by: adminUser?.id
+                })
+                .eq('id', sellerId);
+              if (error) throw error;
+              Alert.alert('تم', 'تم منح علامة التوثيق بنجاح ✓');
+              loadSellers();
+            } catch (err) {
+              Alert.alert('خطأ', err.message);
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleRevokeVerification = async (sellerId) => {
+    Alert.alert(
+      'إلغاء التوثيق',
+      'هل تريد إلغاء توثيق هذا البائع؟',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'تأكيد',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const { error } = await supabase
+                .from('seller_profiles')
+                .update({
+                  is_verified: false,
+                  verified_at: null,
+                  verified_by: null
+                })
+                .eq('id', sellerId);
+              if (error) throw error;
+              Alert.alert('تم', 'تم إلغاء التوثيق');
+              loadSellers();
+            } catch (err) {
+              Alert.alert('خطأ', err.message);
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const updatePlatformSetting = async (key, value) => {
@@ -218,7 +291,10 @@ export default function AdminDashboardScreen({ navigation }) {
       {sellers.map(seller => (
         <TouchableOpacity key={seller.id} style={styles.sellerCard} onPress={() => { setSelectedSeller(seller); setShowSellerModal(true); }}>
           <View style={styles.sellerHeader}>
-            <Text style={styles.kitchenName}>{seller.kitchen_name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.kitchenName}>{seller.kitchen_name}</Text>
+              {seller.is_verified && <VerifiedBadge size={16} />}
+            </View>
             <View style={[styles.statusBadge, { backgroundColor: statusColors[seller.status] + '20' }]}>
               <Text style={[styles.statusText, { color: statusColors[seller.status] }]}>{seller.status}</Text>
             </View>
@@ -397,6 +473,40 @@ export default function AdminDashboardScreen({ navigation }) {
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalScroll}>
+               <View style={styles.verificationSection}>
+                 <Text style={styles.sectionTitle}>حالة التوثيق</Text>
+                 <View style={styles.verificationStatusRow}>
+                   {selectedSeller.is_verified ? (
+                     <View style={{ gap: 4, alignItems: 'flex-end' }}>
+                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                         <Text style={[styles.detailValue, { color: '#1D9BF0' }]}>موثق</Text>
+                         <VerifiedBadge size={20} />
+                       </View>
+                       <Text style={styles.verifiedAtText}>
+                         تاريخ التوثيق: {new Date(selectedSeller.verified_at).toLocaleDateString('ar-EG')}
+                       </Text>
+                       <TouchableOpacity
+                         style={[styles.actionBtn, { backgroundColor: colors.error, marginTop: 8, paddingHorizontal: 16 }]}
+                         onPress={() => handleRevokeVerification(selectedSeller.id)}
+                       >
+                         <Text style={styles.actionBtnText}>إلغاء التوثيق</Text>
+                       </TouchableOpacity>
+                     </View>
+                   ) : (
+                     <View style={{ gap: 8, alignItems: 'flex-end' }}>
+                       <Text style={[styles.detailValue, { color: colors.textLight }]}>غير موثق</Text>
+                       <TouchableOpacity
+                         style={[styles.actionBtn, { backgroundColor: '#1D9BF0', paddingHorizontal: 16 }]}
+                         onPress={() => handleGrantVerification(selectedSeller.id)}
+                       >
+                         <Text style={styles.actionBtnText}>منح التوثيق ✓</Text>
+                       </TouchableOpacity>
+                     </View>
+                   )}
+                 </View>
+               </View>
+
+               <Text style={styles.sectionTitle}>المعلومات الأساسية</Text>
                <Text style={styles.detailLabel}>اسم المطبخ: <Text style={styles.detailValue}>{selectedSeller.kitchen_name}</Text></Text>
                <Text style={styles.detailLabel}>الاسم الكامل: <Text style={styles.detailValue}>{selectedSeller.users?.full_name}</Text></Text>
                <Text style={styles.detailLabel}>رقم الهاتف: <Text style={styles.detailValue}>{selectedSeller.users?.phone}</Text></Text>
@@ -575,5 +685,8 @@ const styles = StyleSheet.create({
   rejectionInput: { backgroundColor: '#f9f9f9', borderRadius: 12, padding: 16, height: 100, textAlignVertical: 'top', textAlign: 'right' },
   modalButtons: { flexDirection: 'row', gap: 12 },
   modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: '#eee' },
-  modalBtnText: { fontSize: 14, fontWeight: 'bold', color: '#666' }
+  modalBtnText: { fontSize: 14, fontWeight: 'bold', color: '#666' },
+  verificationSection: { backgroundColor: '#F0F9FF', padding: 12, borderRadius: 12, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#1D9BF0' },
+  verificationStatusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  verifiedAtText: { fontSize: 11, color: colors.textLight, textAlign: 'right' }
 });

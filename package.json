@@ -2,6 +2,13 @@
   "name": "beiti",
   "version": "1.0.0",
   "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "update:preview": "eas update --channel preview --message"
+  },
   "dependencies": {
     "expo": "~54.0.34",
     "expo-status-bar": "~3.0.9",
@@ -19,6 +26,11 @@
     "expo-image-picker": "~16.0.0",
     "expo-linear-gradient": "~15.0.8",
     "expo-location": "~19.0.8",
+    "expo-status-bar": "~3.0.9",
+    "expo-updates": "^55.0.21",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
@@ -26,5 +38,13 @@
     "react-native-worklets-core": "~1.6.3",
     "expo-dev-client": "~6.0.21"
   },
+  "private": true,
+  "devDependencies": {
+    "@expo/cli": "^55.0.24",
+    "@types/react": "^19.2.14",
+    "dotenv": "^17.4.2",
+    "typescript": "^5.9.3"
+  }
+}
   "private": true
 }
