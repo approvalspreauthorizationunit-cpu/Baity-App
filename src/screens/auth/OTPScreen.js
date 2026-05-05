@@ -5,14 +5,17 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
+import { supabase } from '../../lib/supabase';
+import { useApp } from '../../context/AppContext';
 
 export default function OTPScreen({ navigation, route }) {
   const { phone } = route.params;
-  const [otp, setOtp] = useState(['', '', '', '']);
+  const { login } = useApp();
+  const [otp, setOtp] = useState(['', '', '', '', '', '']); // Supabase typically uses 6 digits
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(60);
-  const inputRefs = [useRef(), useRef(), useRef(), useRef()];
+  const inputRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -43,21 +46,21 @@ export default function OTPScreen({ navigation, route }) {
     if (value.length > 1) {
       const chars = value.split('');
       chars.forEach((char, i) => {
-        if (index + i < 4) newOtp[index + i] = char;
+        if (index + i < 6) newOtp[index + i] = char;
       });
       setOtp(newOtp);
-      const nextIndex = Math.min(index + value.length, 3);
+      const nextIndex = Math.min(index + value.length, 5);
       if (inputRefs[nextIndex].current) inputRefs[nextIndex].current.focus();
-      if (newOtp.join('').length === 4) verifyOTP(newOtp.join(''));
+      if (newOtp.join('').length === 6) verifyOTP(newOtp.join(''));
       return;
     }
     newOtp[index] = value;
     setOtp(newOtp);
     if (error) setError('');
-    if (value && index < 3) {
+    if (value && index < 5) {
       inputRefs[index + 1].current.focus();
     }
-    if (newOtp.join('').length === 4) {
+    if (newOtp.join('').length === 6) {
       verifyOTP(newOtp.join(''));
     }
   };
@@ -68,35 +71,83 @@ export default function OTPScreen({ navigation, route }) {
     }
   };
 
-  const verifyOTP = (code) => {
+  const verifyOTP = async (code) => {
     const finalCode = code || otp.join('');
-    if (finalCode.length < 4) {
+    if (finalCode.length < 6) {
       setError('برجاء إدخال الكود كاملاً');
       shake();
       return;
     }
-    if (finalCode !== '1234') {
-      setError('الكود غير صحيح. الكود التجريبي هو 1234');
-      shake();
-      return;
-    }
+
     setLoading(true);
     setError('');
-    setTimeout(() => {
+
+    try {
+      const { data, error: authError } = await supabase.auth.verifyOtp({
+        phone: phone,
+        token: finalCode,
+        type: 'sms'
+      });
+
+      if (authError) {
+        setError(authError.message);
+        shake();
+      } else if (data.user) {
+        // Check if user profile exists
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profile) {
+          await login({ ...profile, supabaseUser: data.user });
+          // Navigation logic based on role
+          if (profile.role === 'seller') {
+             // Check if seller profile setup is complete
+             const { data: sellerProfile } = await supabase
+               .from('seller_profiles')
+               .select('status')
+               .eq('user_id', data.user.id)
+               .single();
+
+             if (sellerProfile) {
+                navigation.navigate('SellerRoot');
+             } else {
+                navigation.navigate('SellerSetup');
+             }
+          } else {
+             navigation.navigate('CustomerRoot');
+          }
+        } else {
+          navigation.navigate('RoleSelection', { userId: data.user.id, phone });
+        }
+      }
+    } catch (err) {
+      setError('حدث خطأ في التحقق، حاول مرة أخرى');
+      shake();
+    } finally {
       setLoading(false);
-      navigation.navigate('RoleSelection', { phone });
-    }, 1000);
+    }
   };
 
-  const resendCode = () => {
+  const resendCode = async () => {
     if (countdown > 0) return;
-    setCountdown(60);
-    setOtp(['', '', '', '']);
-    setError('');
-    inputRefs[0].current.focus();
+    setLoading(true);
+    const { error: resendError } = await supabase.auth.signInWithOtp({ phone });
+    setLoading(false);
+
+    if (resendError) {
+      setError(resendError.message);
+    } else {
+      setCountdown(60);
+      setOtp(['', '', '', '', '', '']);
+      setError('');
+      inputRefs[0].current.focus();
+    }
   };
 
-  const isComplete = otp.join('').length === 4;
+  const isComplete = otp.join('').length === 6;
 
   return (
     <KeyboardAvoidingView
@@ -115,7 +166,7 @@ export default function OTPScreen({ navigation, route }) {
         </View>
         <Text style={styles.title}>كود التحقق</Text>
         <Text style={styles.subtitle}>
-          تم إرسال كود مكون من 4 أرقام على
+          تم إرسال كود مكون من 6 أرقام على
         </Text>
         <Text style={styles.phone}>{phone}</Text>
       </View>
@@ -134,7 +185,7 @@ export default function OTPScreen({ navigation, route }) {
             onChangeText={(val) => handleOtpChange(val, index)}
             onKeyPress={(e) => handleKeyPress(e, index)}
             keyboardType="number-pad"
-            maxLength={4}
+            maxLength={6}
             textAlign="center"
             selectTextOnFocus
           />
@@ -148,10 +199,6 @@ export default function OTPScreen({ navigation, route }) {
         </View>
       ) : null}
 
-      <View style={styles.demoHint}>
-        <Text style={styles.demoText}>الكود التجريبي: <Text style={styles.demoCode}>1234</Text></Text>
-      </View>
-
       <TouchableOpacity
         style={[styles.button, (!isComplete || loading) && styles.buttonDisabled]}
         onPress={() => verifyOTP()}
@@ -164,9 +211,9 @@ export default function OTPScreen({ navigation, route }) {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.resendButton, countdown > 0 && styles.resendDisabled]}
+        style={[styles.resendButton, (countdown > 0 || loading) && styles.resendDisabled]}
         onPress={resendCode}
-        disabled={countdown > 0}
+        disabled={countdown > 0 || loading}
       >
         <Ionicons name="refresh-outline" size={16} color={countdown > 0 ? colors.textMuted : colors.primary} />
         <Text style={[styles.resendText, countdown > 0 && styles.resendTextDisabled]}>
@@ -233,17 +280,17 @@ const styles = StyleSheet.create({
   otpContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 16,
+    gap: 10,
     marginBottom: 20,
   },
   otpInput: {
-    width: 60,
-    height: 68,
+    width: 45,
+    height: 56,
     backgroundColor: colors.white,
-    borderRadius: 14,
-    borderWidth: 2,
+    borderRadius: 12,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     color: colors.text,
     textAlign: 'center',
@@ -267,22 +314,6 @@ const styles = StyleSheet.create({
     color: colors.error,
     textAlign: 'center',
   },
-  demoHint: {
-    backgroundColor: '#FFF0E8',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  demoText: {
-    fontSize: 13,
-    color: colors.primary,
-  },
-  demoCode: {
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
   button: {
     backgroundColor: colors.primary,
     borderRadius: 30,
@@ -295,6 +326,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
     marginBottom: 20,
+    marginTop: 20,
   },
   buttonDisabled: {
     backgroundColor: colors.offlineGray,

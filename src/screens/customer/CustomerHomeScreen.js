@@ -1,23 +1,80 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
-  TouchableOpacity, StatusBar, ScrollView, Platform
+  TouchableOpacity, StatusBar, ScrollView, Platform, ActivityIndicator
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
+import { supabase } from '../../lib/supabase';
 import SellerCard from '../../components/SellerCard';
+import LoadingScreen from '../../components/LoadingScreen';
+import EmptyState from '../../components/EmptyState';
 
 const categories = ['الكل', 'كشري', 'فتة', 'حلويات', 'مشاوي', 'سلطات', 'خبز', 'ملوخية', 'عصائر'];
 
 export default function CustomerHomeScreen({ navigation }) {
-  const { sellers, user } = useApp();
+  const { user } = useApp();
   const [locationLabel, setLocationLabel] = useState('تحديد موقعك...');
+  const [sellers, setSellers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('الكل');
+  const [sortBy, setSortBy] = useState('distance');
 
   useEffect(() => {
     requestLocation();
+    loadSellers();
   }, []);
+
+  const loadSellers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('seller_profiles')
+        .select(`
+          *,
+          users (full_name, avatar_url, region_id),
+          products (id, name, price, category, is_available),
+          ratings (score)
+        `)
+        .eq('status', 'approved');
+
+      if (error) throw error;
+
+      if (data) {
+        // Map Supabase data to what the UI expects
+        const mappedSellers = data.map(s => {
+          const sellerProducts = s.products || [];
+          const prices = sellerProducts.map(p => p.price);
+          const minPrice = prices.length ? Math.min(...prices) : 0;
+          const maxPrice = prices.length ? Math.max(...prices) : 0;
+
+          const totalScore = s.ratings?.reduce((sum, r) => sum + r.score, 0) || 0;
+          const reviewCount = s.ratings?.length || 0;
+          const avgRating = reviewCount > 0 ? (totalScore / reviewCount).toFixed(1) : 'جديد';
+
+          return {
+            id: s.id,
+            name: s.kitchen_name || s.users?.full_name || 'بائعة',
+            specialty: s.bio || 'أكل بيتي',
+            categories: [...new Set(sellerProducts.map(p => p.category))].filter(Boolean),
+            rating: avgRating,
+            reviewCount: reviewCount,
+            distance: 0.8, // Placeholder
+            priceRange: prices.length ? `${minPrice}-${maxPrice}` : '0',
+            isOnline: s.is_available,
+            image: s.users?.avatar_url
+          };
+        });
+        setSellers(mappedSellers);
+      }
+    } catch (err) {
+      console.error('Error loading sellers:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const requestLocation = async () => {
     try {
@@ -38,9 +95,6 @@ export default function CustomerHomeScreen({ navigation }) {
       setLocationLabel('القاهرة');
     }
   };
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('الكل');
-  const [sortBy, setSortBy] = useState('distance');
 
   const filteredSellers = useMemo(() => {
     let result = [...sellers];
@@ -65,7 +119,11 @@ export default function CustomerHomeScreen({ navigation }) {
     return result;
   }, [sellers, search, selectedCategory, sortBy]);
 
-  const onlineSellers = sellers.filter(s => s.isOnline).length;
+  const onlineSellers = useMemo(() => sellers.filter(s => s.isOnline).length, [sellers]);
+
+  const handleSearchChange = useCallback((text) => {
+    setSearch(text);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -80,7 +138,7 @@ export default function CustomerHomeScreen({ navigation }) {
           </View>
         </View>
         <View style={styles.headerRight}>
-          <Text style={styles.greeting}>أهلاً، {user?.name?.split(' ')[0]}</Text>
+          <Text style={styles.greeting}>أهلاً، {user?.full_name?.split(' ')[0] || user?.name?.split(' ')[0] || 'بك'}</Text>
           <TouchableOpacity style={styles.locationRow} onPress={requestLocation}>
             <Ionicons name="location-outline" size={13} color={colors.primary} />
             <Text style={styles.locationText} numberOfLines={1}>{locationLabel}</Text>
@@ -95,7 +153,7 @@ export default function CustomerHomeScreen({ navigation }) {
           <TextInput
             style={styles.searchInput}
             value={search}
-            onChangeText={setSearch}
+            onChangeText={handleSearchChange}
             placeholder="ابحث عن طعام أو بائعة..."
             placeholderTextColor={colors.textMuted}
             textAlign="right"
@@ -157,25 +215,29 @@ export default function CustomerHomeScreen({ navigation }) {
       </View>
 
       {/* Sellers List */}
-      <FlatList
-        data={filteredSellers}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <SellerCard
-            seller={item}
-            onPress={() => navigation.navigate('SellerProfile', { sellerId: item.id })}
-          />
-        )}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="search-outline" size={60} color={colors.textLight} />
-            <Text style={styles.emptyTitle}>مفيش نتايج</Text>
-            <Text style={styles.emptyText}>جرب تبحث بكلمة تانية</Text>
-          </View>
-        }
-      />
+      {loading && sellers.length === 0 ? (
+        <LoadingScreen />
+      ) : (
+        <FlatList
+          data={filteredSellers}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <SellerCard
+              seller={item}
+              onPress={() => navigation.navigate('SellerProfile', { sellerId: item.id })}
+            />
+          )}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <EmptyState
+              icon="search-outline"
+              title="لا يوجد طهاة متاحون"
+              message="لا يوجد طهاة متاحون في منطقتك حالياً"
+            />
+          }
+        />
+      )}
     </View>
   );
 }
@@ -354,6 +416,17 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   emptyText: {
+    fontSize: 14,
+    color: colors.textLight,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 100,
+  },
+  loadingText: {
+    marginTop: 12,
     fontSize: 14,
     color: colors.textLight,
   },

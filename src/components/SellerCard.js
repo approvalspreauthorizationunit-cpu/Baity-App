@@ -17,8 +17,14 @@ export default function SellerCard({ seller, onPress }) {
   const { icon, bg } = categoryIcon(seller.categories);
   const renderStars = (rating) => {
     const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalf = rating % 1 >= 0.5;
+    const num = parseFloat(rating);
+
+    if (isNaN(num)) {
+       return <Text style={{ fontSize: 10, color: colors.primary, fontWeight: 'bold' }}>جديد</Text>;
+    }
+
+    const fullStars = Math.floor(num);
+    const hasHalf = num % 1 >= 0.5;
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
         stars.push(<Ionicons key={i} name="star" size={12} color={colors.star} />);

@@ -10,12 +10,18 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppProvider, useApp } from './src/context/AppContext';
 import { colors } from './src/theme/colors';
+import ErrorBoundary from './src/components/ErrorBoundary';
 
 // Auth Screens
 import SplashScreen from './src/screens/auth/SplashScreen';
 import PhoneScreen from './src/screens/auth/PhoneScreen';
 import OTPScreen from './src/screens/auth/OTPScreen';
 import RoleSelectionScreen from './src/screens/auth/RoleSelectionScreen';
+import SellerRegistrationScreen from './src/screens/auth/SellerRegistrationScreen';
+
+// Admin Screens
+import AdminLoginScreen from './src/screens/admin/AdminLoginScreen';
+import AdminDashboardScreen from './src/screens/admin/AdminDashboardScreen';
 
 // Customer Screens
 import CustomerHomeScreen from './src/screens/customer/CustomerHomeScreen';
@@ -25,6 +31,7 @@ import CheckoutScreen from './src/screens/customer/CheckoutScreen';
 import OrderTrackingScreen from './src/screens/customer/OrderTrackingScreen';
 import OrderHistoryScreen from './src/screens/customer/OrderHistoryScreen';
 import CustomerProfileScreen from './src/screens/customer/CustomerProfileScreen';
+import SpecialRequestsScreen from './src/screens/customer/SpecialRequestsScreen';
 
 // Seller Screens
 import SellerDashboardScreen from './src/screens/seller/SellerDashboardScreen';
@@ -33,10 +40,8 @@ import SellerProductsScreen from './src/screens/seller/SellerProductsScreen';
 import AddProductScreen from './src/screens/seller/AddProductScreen';
 import SellerWalletScreen from './src/screens/seller/SellerWalletScreen';
 import SellerSetupScreen from './src/screens/seller/SellerSetupScreen';
-
-// Admin Screens
-import AdminLoginScreen from './src/screens/admin/AdminLoginScreen';
-import AdminDashboardScreen from './src/screens/admin/AdminDashboardScreen';
+import SellerPendingScreen from './src/screens/seller/SellerPendingScreen';
+import SpecialRequestsSellerScreen from './src/screens/seller/SpecialRequestsSellerScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -68,6 +73,7 @@ function CustomerTabs() {
         tabBarIcon: ({ color, size, focused }) => {
           const icons = {
             'الرئيسية': focused ? 'home' : 'home-outline',
+            'طلب خاص': focused ? 'clipboard' : 'clipboard-outline',
             'طلباتي':   focused ? 'receipt' : 'receipt-outline',
             'السلة':    focused ? 'cart' : 'cart-outline',
             'حسابي':    focused ? 'person' : 'person-outline',
@@ -77,6 +83,7 @@ function CustomerTabs() {
       })}
     >
       <Tab.Screen name="الرئيسية" component={CustomerHomeStack} />
+      <Tab.Screen name="طلب خاص" component={SpecialRequestsScreen} />
       <Tab.Screen name="طلباتي"   component={OrderHistoryScreen} />
       <Tab.Screen
         name="السلة"
@@ -126,6 +133,7 @@ function SellerTabs() {
           const icons = {
             'لوحتي':    focused ? 'grid' : 'grid-outline',
             'الطلبات':  focused ? 'list' : 'list-outline',
+            'طلبات خاصة': focused ? 'megaphone' : 'megaphone-outline',
             'منتجاتي':  focused ? 'fast-food' : 'fast-food-outline',
             'المحفظة':  focused ? 'wallet' : 'wallet-outline',
           };
@@ -135,6 +143,7 @@ function SellerTabs() {
     >
       <Tab.Screen name="لوحتي"   component={SellerDashboardScreen} />
       <Tab.Screen name="الطلبات" component={SellerOrdersScreen} />
+      <Tab.Screen name="طلبات خاصة" component={SpecialRequestsSellerScreen} />
       <Tab.Screen name="منتجاتي" component={SellerProductsStack} />
       <Tab.Screen name="المحفظة" component={SellerWalletScreen} />
     </Tab.Navigator>
@@ -169,29 +178,46 @@ function AppNavigator() {
   if (!isLoggedIn) {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Splash"         component={SplashScreen} />
-        <Stack.Screen name="Phone"          component={PhoneScreen} />
-        <Stack.Screen name="OTP"            component={OTPScreen} />
-        <Stack.Screen name="RoleSelection"  component={RoleSelectionScreen} />
-        <Stack.Screen name="AdminLogin"     component={AdminLoginScreen} />
+        <Stack.Screen name="Splash"             component={SplashScreen} />
+        <Stack.Screen name="Phone"              component={PhoneScreen} />
+        <Stack.Screen name="OTP"                component={OTPScreen} />
+        <Stack.Screen name="RoleSelection"      component={RoleSelectionScreen} />
+        <Stack.Screen name="SellerRegistration" component={SellerRegistrationScreen} />
+        <Stack.Screen name="AdminLogin"         component={AdminLoginScreen} />
+        <Stack.Screen name="AdminDashboard"     component={AdminDashboardScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  if (user?.role === 'admin') {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
       </Stack.Navigator>
     );
   }
 
-  if (user?.mode === 'seller') {
-    return (
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="SellerRoot" component={SellerRoot} />
-      </Stack.Navigator>
-    );
+  if (user?.role === 'seller') {
+    if (user.sellerStatus === 'approved') {
+      return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="SellerRoot" component={SellerRoot} />
+          <Stack.Screen name="SellerRegistration" component={SellerRegistrationScreen} />
+        </Stack.Navigator>
+      );
+    } else {
+      return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="SellerPending"      component={SellerPendingScreen} />
+          <Stack.Screen name="SellerRegistration" component={SellerRegistrationScreen} />
+        </Stack.Navigator>
+      );
+    }
   }
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="CustomerRoot"   component={CustomerRoot} />
-      <Stack.Screen name="AdminLogin"     component={AdminLoginScreen} />
-      <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
     </Stack.Navigator>
   );
 }
@@ -201,12 +227,14 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AppProvider>
-          <NavigationContainer>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-            <AppNavigator />
-          </NavigationContainer>
-        </AppProvider>
+        <ErrorBoundary>
+          <AppProvider>
+            <NavigationContainer>
+              <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+              <AppNavigator />
+            </NavigationContainer>
+          </AppProvider>
+        </ErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

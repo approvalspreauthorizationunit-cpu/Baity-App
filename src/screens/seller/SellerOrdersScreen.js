@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar
+  View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar, ActivityIndicator, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
-import { orderStatusLabels } from '../../data/mockData';
+import { supabase } from '../../lib/supabase';
+import LoadingScreen from '../../components/LoadingScreen';
+import EmptyState from '../../components/EmptyState';
 
 const filters = ['الكل', 'في الانتظار', 'جارية', 'مكتملة'];
 const statusColors = {
@@ -18,6 +20,15 @@ const statusColors = {
   cancelled: colors.badge.cancelled,
 };
 
+const statusLabels = {
+  pending: 'في الانتظار',
+  accepted: 'تم القبول',
+  preparing: 'جاري التحضير',
+  ready: 'جاهز للتوصيل',
+  delivered: 'تم التوصيل',
+  cancelled: 'ملغي',
+};
+
 function formatTime(iso) {
   const d = new Date(iso);
   return d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
@@ -25,19 +36,100 @@ function formatTime(iso) {
 
 export default function SellerOrdersScreen() {
   const insets = useSafeAreaInsets();
-  const { user, sellers, orders, updateOrderStatus } = useApp();
+  const { user } = useApp();
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('الكل');
 
-  const myProfile = sellers.find(s => s.id === user?.sellerProfile?.sellerId) || sellers[0];
-  const myOrders = orders.filter(o => o.sellerId === myProfile?.id);
+  useEffect(() => {
+    let channel = null;
 
-  const filteredOrders = myOrders.filter(o => {
+    const setup = async () => {
+      // 1. Get seller profile
+      const { data: profile } = await supabase
+        .from('seller_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile) return;
+      const sellerProfileId = profile.id;
+
+      await loadOrders(sellerProfileId);
+
+      // 2. Subscribe to realtime
+      channel = supabase
+        .channel('seller-orders')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `seller_id=eq.${sellerProfileId}`
+        }, () => {
+          loadOrders(sellerProfileId);
+        })
+        .subscribe();
+    };
+
+    setup();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const loadOrders = async (sellerProfileId) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (*, products (name)),
+          users (full_name)
+        `)
+        .eq('seller_id', sellerProfileId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (err) {
+      console.error('Error loading orders:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateOrderStatus = async (orderId, status) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      if (status === 'delivered') {
+        const { error: funcError } = await supabase.functions.invoke(
+          'process-order-completion',
+          { body: { order_id: orderId } }
+        );
+        if (funcError) console.error('Error processing order completion:', funcError);
+      }
+
+      // Realtime listener will handle the local state update
+    } catch (err) {
+      Alert.alert('خطأ', 'تعذر تحديث حالة الطلب');
+    }
+  };
+
+  const filteredOrders = useMemo(() => orders.filter(o => {
     if (filter === 'الكل') return true;
     if (filter === 'في الانتظار') return o.status === 'pending';
     if (filter === 'جارية') return ['accepted', 'preparing', 'ready'].includes(o.status);
     if (filter === 'مكتملة') return ['delivered', 'cancelled'].includes(o.status);
     return true;
-  });
+  }), [orders, filter]);
 
   const nextStatus = {
     pending: null, // use accept/reject
@@ -60,19 +152,19 @@ export default function SellerOrdersScreen() {
         <View style={styles.headerRight}>
           <View style={[styles.statusBadge, { backgroundColor: statusColors[order.status] + '20' }]}>
             <Text style={[styles.statusText, { color: statusColors[order.status] }]}>
-              {orderStatusLabels[order.status]}
+              {statusLabels[order.status]}
             </Text>
           </View>
-          <Text style={styles.orderTime}>{formatTime(order.createdAt)}</Text>
+          <Text style={styles.orderTime}>{formatTime(order.created_at)}</Text>
         </View>
       </View>
 
       {/* Items */}
       <View style={styles.itemsList}>
-        {order.items.map((item, i) => (
+        {order.order_items.map((item, i) => (
           <View key={i} style={styles.itemRow}>
-            <Text style={styles.itemPrice}>{item.price * item.quantity} ج</Text>
-            <Text style={styles.itemName}>{item.name} × {item.quantity}</Text>
+            <Text style={styles.itemPrice}>{item.unit_price * item.quantity} ج</Text>
+            <Text style={styles.itemName}>{item.products?.name} × {item.quantity}</Text>
           </View>
         ))}
       </View>
@@ -88,7 +180,7 @@ export default function SellerOrdersScreen() {
       {/* Footer */}
       <View style={styles.cardFooter}>
         <Text style={styles.totalLabel}>الإجمالي</Text>
-        <Text style={styles.totalValue}>{order.grandTotal} جنيه</Text>
+        <Text style={styles.totalValue}>{order.total_amount} جنيه</Text>
       </View>
 
       {/* Actions */}
@@ -127,7 +219,7 @@ export default function SellerOrdersScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>الطلبات</Text>
         <View style={styles.countBadge}>
-          <Text style={styles.countText}>{myOrders.length}</Text>
+          <Text style={styles.countText}>{orders.length}</Text>
         </View>
       </View>
 
@@ -143,11 +235,14 @@ export default function SellerOrdersScreen() {
         ))}
       </View>
 
-      {filteredOrders.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="receipt-outline" size={60} color={colors.textLight} />
-          <Text style={styles.emptyTitle}>لا توجد طلبات</Text>
-        </View>
+      {loading && orders.length === 0 ? (
+        <LoadingScreen />
+      ) : filteredOrders.length === 0 ? (
+        <EmptyState
+          icon="receipt-outline"
+          title="لا توجد طلبات"
+          message="لا توجد طلبات حالياً"
+        />
       ) : (
         <FlatList
           data={filteredOrders}
@@ -155,6 +250,12 @@ export default function SellerOrdersScreen() {
           renderItem={renderOrder}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onRefresh={() => {
+             supabase.from('seller_profiles').select('id').eq('user_id', user.id).single().then(({data}) => {
+                if(data) loadOrders(data.id);
+             });
+          }}
+          refreshing={loading}
         />
       )}
     </View>
@@ -163,6 +264,7 @@ export default function SellerOrdersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end',
     paddingHorizontal: 16, paddingVertical: 14,

@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Modal, TextInput, ActivityIndicator, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
-import { orderStatusLabels } from '../../data/mockData';
+import { supabase } from '../../lib/supabase';
+
+const orderStatusLabels = {
+  pending: 'تم استلام الطلب',
+  accepted: 'تم قبول الطلب',
+  preparing: 'جاري التحضير',
+  ready: 'جاهز للتوصيل',
+  delivered: 'تم التوصيل',
+  cancelled: 'تم إلغاء الطلب',
+};
 
 const statusOrder = ['pending', 'accepted', 'preparing', 'ready', 'delivered'];
 const statusIcons = {
@@ -33,29 +42,104 @@ function formatTime(iso) {
 
 export default function OrderTrackingScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { orders, updateOrderStatus } = useApp();
-  const [refreshKey, setRefreshKey] = useState(0);
-
+  const { user } = useApp();
   const orderId = route?.params?.orderId;
-  let order;
-  if (orderId === 'latest' || !orderId) {
-    order = orders[0];
-  } else {
-    order = orders.find(o => o.id === orderId);
-  }
 
-  // Auto-advance demo order
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [ratingScore, setRatingScore] = useState(5);
+  const [ratingComment, setRatingComment] = useState('');
+  const [submittingRating, setSubmittingRating] = useState(false);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+
   useEffect(() => {
-    if (!order || order.status === 'delivered' || order.status === 'cancelled') return;
-    const idx = statusOrder.indexOf(order.status);
-    if (idx < statusOrder.length - 1) {
-      const timer = setTimeout(() => {
-        updateOrderStatus(order.id, statusOrder[idx + 1]);
-        setRefreshKey(k => k + 1);
-      }, 8000);
-      return () => clearTimeout(timer);
+    if (orderId) {
+      fetchOrder();
+      const unsubscribe = subscribeToOrder();
+      return unsubscribe;
     }
-  }, [order?.status, refreshKey]);
+  }, [orderId]);
+
+  const fetchOrder = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          seller_profiles (kitchen_name, working_hours),
+          order_items (quantity, unit_price, products(name)),
+          ratings (id)
+        `)
+        .eq('id', orderId)
+        .single();
+
+      if (error) throw error;
+      setOrder(data);
+
+      // If delivered and no rating, show modal
+      if (data.status === 'delivered' && !data.ratings?.id && !ratingSubmitted) {
+        setRatingModalVisible(true);
+      }
+    } catch (err) {
+      console.error('Error fetching order:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const subscribeToOrder = () => {
+    const channel = supabase
+      .channel('order-tracking-' + orderId)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'orders',
+        filter: `id=eq.${orderId}`
+      }, (payload) => {
+        setOrder(prev => ({ ...prev, ...payload.new }));
+        if (payload.new.status === 'delivered' && !ratingSubmitted) {
+          setRatingModalVisible(true);
+        }
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  };
+
+  const submitRating = async () => {
+    setSubmittingRating(true);
+    try {
+      const { error } = await supabase
+        .from('ratings')
+        .insert({
+          order_id: orderId,
+          customer_id: user.id,
+          seller_id: order.seller_id,
+          score: ratingScore,
+          comment: ratingComment
+        });
+
+      if (error) throw error;
+
+      setRatingSubmitted(true);
+      setRatingModalVisible(false);
+      Alert.alert('شكراً لتقييمك!');
+    } catch (err) {
+      Alert.alert('خطأ', 'حدث خطأ في تقديم التقييم');
+    } finally {
+      setSubmittingRating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   if (!order) {
     return (
@@ -111,16 +195,15 @@ export default function OrderTrackingScreen({ navigation, route }) {
               </View>
               <View style={styles.timelineContent}>
                 <Text style={[styles.timelineLabel, { color: colors.error }]}>تم إلغاء الطلب</Text>
-                {order.timeline[order.timeline.length - 1] && (
-                  <Text style={styles.timelineTime}>{formatTime(order.timeline[order.timeline.length - 1].time)}</Text>
-                )}
+                <Text style={styles.timelineTime}>{formatTime(order.created_at)}</Text>
               </View>
             </View>
           ) : (
             statusOrder.map((status, index) => {
               const done = index <= currentStatusIndex;
               const current = index === currentStatusIndex;
-              const timelineEntry = order.timeline?.find(t => t.status === status);
+              // Note: our current DB schema doesn't have a timeline table yet, so we just highlight the current status.
+              // In a real app, you might have an order_events table for multiple timestamps.
               return (
                 <View key={status} style={styles.timelineRow}>
                   <View style={styles.timelineLeft}>
@@ -142,8 +225,8 @@ export default function OrderTrackingScreen({ navigation, route }) {
                     <Text style={[styles.timelineLabel, !done && styles.timelineLabelInactive]}>
                       {orderStatusLabels[status]}
                     </Text>
-                    {timelineEntry && (
-                      <Text style={styles.timelineTime}>{formatTime(timelineEntry.time)}</Text>
+                    {current && (
+                      <Text style={styles.timelineTime}>الآن</Text>
                     )}
                   </View>
                 </View>
@@ -158,12 +241,12 @@ export default function OrderTrackingScreen({ navigation, route }) {
           <View style={styles.detailRow}>
             <Ionicons name="storefront-outline" size={16} color={colors.primary} />
             <Text style={styles.detailLabel}>البائعة</Text>
-            <Text style={styles.detailValue}>{order.sellerName}</Text>
+            <Text style={styles.detailValue}>{order.seller_profiles?.kitchen_name}</Text>
           </View>
           <View style={styles.detailRow}>
             <Ionicons name="location-outline" size={16} color={colors.primary} />
             <Text style={styles.detailLabel}>العنوان</Text>
-            <Text style={styles.detailValue} numberOfLines={1}>{order.address}</Text>
+            <Text style={styles.detailValue} numberOfLines={1}>{order.delivery_address}</Text>
           </View>
           {order.notes ? (
             <View style={styles.detailRow}>
@@ -177,39 +260,89 @@ export default function OrderTrackingScreen({ navigation, route }) {
         {/* Items */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>الأصناف</Text>
-          {order.items.map((item, i) => (
+          {order.order_items?.map((item, i) => (
             <View key={i} style={styles.orderItem}>
-              <Text style={styles.orderItemName}>{item.name}</Text>
+              <Text style={styles.orderItemName}>{item.products?.name}</Text>
               <Text style={styles.orderItemQty}>× {item.quantity}</Text>
-              <Text style={styles.orderItemPrice}>{item.price * item.quantity} جنيه</Text>
+              <Text style={styles.orderItemPrice}>{item.unit_price * item.quantity} جنيه</Text>
             </View>
           ))}
           <View style={styles.divider} />
           <View style={styles.orderItem}>
             <Text style={styles.orderItemName}>توصيل</Text>
-            <Text style={styles.orderItemPrice}>{order.deliveryFee} جنيه</Text>
+            <Text style={styles.orderItemPrice}>{order.delivery_fee} جنيه</Text>
           </View>
-          {order.donation > 0 && (
+          {order.donation_amount > 0 && (
             <View style={styles.orderItem}>
               <Text style={[styles.orderItemName, { color: colors.primary }]}>تبرع</Text>
-              <Text style={[styles.orderItemPrice, { color: colors.primary }]}>+{order.donation} جنيه</Text>
+              <Text style={[styles.orderItemPrice, { color: colors.primary }]}>+{order.donation_amount} جنيه</Text>
             </View>
           )}
           <View style={[styles.orderItem, { marginTop: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border }]}>
             <Text style={styles.totalLabel}>الإجمالي</Text>
-            <Text style={styles.totalValue}>{order.grandTotal} جنيه</Text>
+            <Text style={styles.totalValue}>{order.total_amount + (order.donation_amount || 0)} جنيه</Text>
           </View>
         </View>
 
         {/* Action Buttons */}
-        {order.status === 'delivered' && (
+        {order.status === 'delivered' && !order.ratings?.id && !ratingSubmitted && (
           <View style={styles.section}>
-            <TouchableOpacity style={styles.rateBtn}>
+            <TouchableOpacity style={styles.rateBtn} onPress={() => setRatingModalVisible(true)}>
               <Ionicons name="star" size={18} color={colors.white} />
               <Text style={styles.rateBtnText}>قيّم البائعة</Text>
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Rating Modal */}
+        <Modal visible={ratingModalVisible} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.ratingBox}>
+              <Text style={styles.ratingTitle}>قيّم تجربتك</Text>
+              <Text style={styles.ratingKitchen}>كيف كانت وجبتك من {order.seller_profiles?.kitchen_name}؟</Text>
+
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map(s => (
+                  <TouchableOpacity key={s} onPress={() => setRatingScore(s)}>
+                    <Ionicons
+                      name={s <= ratingScore ? "star" : "star-outline"}
+                      size={40}
+                      color={s <= ratingScore ? "#FFD700" : colors.border}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.ratingInput}
+                placeholder="اكتب رأيك هنا (اختياري)..."
+                multiline
+                value={ratingComment}
+                onChangeText={setRatingComment}
+                textAlign="right"
+              />
+
+              <TouchableOpacity
+                style={[styles.submitRatingBtn, submittingRating && { opacity: 0.7 }]}
+                onPress={submitRating}
+                disabled={submittingRating}
+              >
+                {submittingRating ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.submitRatingText}>إرسال التقييم</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.closeRatingBtn}
+                onPress={() => setRatingModalVisible(false)}
+              >
+                <Text style={styles.closeRatingText}>لاحقاً</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
         <View style={{ height: 24 }} />
       </ScrollView>
@@ -274,4 +407,25 @@ const styles = StyleSheet.create({
   rateBtnText: { color: colors.white, fontSize: 15, fontWeight: 'bold' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyText: { fontSize: 16, color: colors.textLight },
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24
+  },
+  ratingBox: {
+    backgroundColor: '#fff', borderRadius: 24, padding: 24, width: '100%', alignItems: 'center'
+  },
+  ratingTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 8 },
+  ratingKitchen: { fontSize: 14, color: colors.textLight, textAlign: 'center', marginBottom: 20 },
+  starsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
+  ratingInput: {
+    width: '100%', backgroundColor: colors.background, borderRadius: 12, padding: 12,
+    minHeight: 80, fontSize: 14, color: colors.text, marginBottom: 20,
+    borderWidth: 1, borderColor: colors.border, textAlignVertical: 'top'
+  },
+  submitRatingBtn: {
+    backgroundColor: colors.primary, width: '100%', borderRadius: 14, paddingVertical: 14,
+    alignItems: 'center', marginBottom: 12
+  },
+  submitRatingText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  closeRatingBtn: { padding: 8 },
+  closeRatingText: { color: colors.textLight, fontSize: 14 }
 });

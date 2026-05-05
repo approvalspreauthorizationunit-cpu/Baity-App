@@ -1,27 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, ActivityIndicator, TextInput
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
-
-const rechargeAmounts = [50, 100, 200, 500];
-const commissionRate = 0.10;
+import { supabase } from '../../lib/supabase';
+import LoadingScreen from '../../components/LoadingScreen';
 
 function TransactionRow({ icon, label, amount, time, type }) {
+  const isCredit = type === 'credit';
   return (
     <View style={styles.transRow}>
-      <View style={[styles.transIcon, { backgroundColor: type === 'credit' ? '#E8F5E9' : '#FFF0E8' }]}>
-        <Ionicons name={icon} size={18} color={type === 'credit' ? colors.success : colors.primary} />
+      <View style={[styles.transIcon, { backgroundColor: isCredit ? '#E8F5E9' : '#FFF0E8' }]}>
+        <Ionicons
+          name={icon || (isCredit ? 'add-circle-outline' : 'remove-circle-outline')}
+          size={18}
+          color={isCredit ? colors.success : colors.primary}
+        />
       </View>
       <View style={styles.transInfo}>
         <Text style={styles.transLabel}>{label}</Text>
-        <Text style={styles.transTime}>{time}</Text>
+        <Text style={styles.transTime}>{new Date(time).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</Text>
       </View>
-      <Text style={[styles.transAmount, { color: type === 'credit' ? colors.success : colors.error }]}>
-        {type === 'credit' ? '+' : '-'}{amount} ج
+      <Text style={[styles.transAmount, { color: isCredit ? colors.success : colors.error }]}>
+        {isCredit ? '+' : '-'}{amount} ج
       </Text>
     </View>
   );
@@ -29,42 +33,107 @@ function TransactionRow({ icon, label, amount, time, type }) {
 
 export default function SellerWalletScreen() {
   const insets = useSafeAreaInsets();
-  const { user, sellers, orders } = useApp();
-  const myProfile = sellers.find(s => s.id === user?.sellerProfile?.sellerId) || sellers[0];
-  const myOrders = orders.filter(o => o.sellerId === myProfile?.id && o.status === 'delivered');
-  const [selectedAmount, setSelectedAmount] = useState(null);
+  const { user } = useApp();
 
-  const totalEarnings = myOrders.reduce((s, o) => s + o.total, 0);
-  const totalCommission = Math.floor(totalEarnings * commissionRate);
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [minWithdrawal, setMinWithdrawal] = useState(100);
 
-  const handleRecharge = () => {
-    if (!selectedAmount) { Alert.alert('تنبيه', 'اختاري مبلغ الشحن'); return; }
-    Alert.alert(
-      'شحن الرصيد',
-      `سيتم شحن ${selectedAmount} جنيه عبر فودافون كاش\nرقم فودافون: 01010101010`,
-      [
-        { text: 'إلغاء', style: 'cancel' },
-        {
-          text: 'تأكيد',
-          onPress: () => Alert.alert('تم', `تم إرسال طلب شحن ${selectedAmount} جنيه. سيتم التفعيل خلال دقائق.`),
-        },
-      ]
-    );
+  const [requestedAmount, setRequestedAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('فودافون كاش');
+  const [paymentPhone, setPaymentPhone] = useState(user?.phone || '');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    loadWalletData();
+  }, []);
+
+  const loadWalletData = async () => {
+    setLoading(true);
+    try {
+      // 1. Load Profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('seller_profiles')
+        .select('id, wallet_balance, commission_rate')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+      setProfile(profileData);
+
+      // 2. Load Platform Settings
+      const { data: setting } = await supabase
+        .from('platform_settings')
+        .select('value')
+        .eq('key', 'min_withdrawal_amount')
+        .single();
+
+      if (setting) setMinWithdrawal(parseInt(setting.value));
+
+      // 3. Load Transactions
+      const { data: transData } = await supabase
+        .from('wallet_transactions')
+        .select('*')
+        .eq('seller_id', profileData.id)
+        .order('created_at', { ascending: false });
+
+      setTransactions(transData || []);
+
+      // 4. Load Withdrawals
+      const { data: withData } = await supabase
+        .from('withdrawal_requests')
+        .select('*')
+        .eq('seller_id', profileData.id)
+        .order('created_at', { ascending: false });
+
+      setWithdrawals(withData || []);
+
+    } catch (err) {
+      console.error('Error loading wallet data:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Build mock transactions from orders
-  const transactions = [
-    ...myOrders.slice(0, 5).map(o => ({
-      id: o.id + '_commission',
-      icon: 'remove-circle-outline',
-      label: `عمولة طلب #${o.id.slice(-4)}`,
-      amount: Math.floor(o.total * commissionRate),
-      time: new Date(o.updatedAt).toLocaleDateString('ar-EG'),
-      type: 'debit',
-    })),
-    { id: 'r1', icon: 'add-circle-outline', label: 'شحن رصيد', amount: 500, time: '5 أبريل 2026', type: 'credit' },
-    { id: 'r2', icon: 'add-circle-outline', label: 'شحن رصيد', amount: 200, time: '1 أبريل 2026', type: 'credit' },
-  ].sort((a, b) => b.id.localeCompare(a.id));
+  const handleWithdraw = async () => {
+    const amount = parseFloat(requestedAmount);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('تنبيه', 'برجاء إدخال مبلغ صحيح');
+      return;
+    }
+    if (amount > profile.wallet_balance) {
+      Alert.alert('تنبيه', 'المبلغ المطلوب أكبر من رصيدك الحالي');
+      return;
+    }
+    if (amount < minWithdrawal) {
+      Alert.alert('تنبيه', `الحد الأدنى للسحب هو ${minWithdrawal} جنيه`);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('withdrawal_requests')
+        .insert({
+          seller_id: profile.id,
+          amount: amount,
+          status: 'pending',
+          payment_method: `${paymentMethod} (${paymentPhone})`
+        });
+
+      if (error) throw error;
+
+      Alert.alert('تم', 'تم إرسال طلب السحب بنجاح، سيتم مراجعته من الإدارة');
+      setRequestedAmount('');
+      loadWalletData();
+    } catch (err) {
+      Alert.alert('خطأ', 'حدث خطأ في تقديم الطلب');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -73,117 +142,154 @@ export default function SellerWalletScreen() {
         <Text style={styles.headerTitle}>المحفظة</Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Balance Card */}
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>رصيدك الحالي</Text>
-          <Text style={styles.balanceAmount}>{myProfile?.walletBalance || 0}</Text>
-          <Text style={styles.balanceCurrency}>جنيه مصري</Text>
-          <View style={styles.balanceNote}>
-            <Ionicons name="information-circle-outline" size={14} color="rgba(255,255,255,0.8)" />
-            <Text style={styles.balanceNoteText}>
-              يجب أن يكون الرصيد أكبر من 0 لتظهري للعملاء
-            </Text>
+      {loading ? (
+        <LoadingScreen />
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {/* Balance Card */}
+          <View style={styles.balanceCard}>
+            <Text style={styles.balanceLabel}>رصيدك المتاح للسحب</Text>
+            <Text style={styles.balanceAmount}>{profile?.wallet_balance || 0}</Text>
+            <Text style={styles.balanceCurrency}>جنيه مصري</Text>
+            {profile?.wallet_balance < minWithdrawal && (
+              <View style={styles.balanceNote}>
+                <Ionicons name="information-circle-outline" size={14} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.balanceNoteText}>
+                  الحد الأدنى للسحب هو {minWithdrawal} جنيه
+                </Text>
+              </View>
+            )}
           </View>
-        </View>
 
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Ionicons name="cash-outline" size={20} color={colors.success} style={styles.statEmoji} />
-            <Text style={styles.statValue}>{totalEarnings}</Text>
-            <Text style={styles.statLabel}>إجمالي المبيعات</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Ionicons name="pie-chart-outline" size={20} color={colors.error} style={styles.statEmoji} />
-            <Text style={[styles.statValue, { color: colors.error }]}>{totalCommission}</Text>
-            <Text style={styles.statLabel}>إجمالي العمولات</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Ionicons name="bag-check-outline" size={20} color={colors.primary} style={styles.statEmoji} />
-            <Text style={styles.statValue}>{myOrders.length}</Text>
-            <Text style={styles.statLabel}>طلب مكتمل</Text>
-          </View>
-        </View>
-
-        {/* Commission Info */}
-        <View style={styles.commissionCard}>
-          <View style={styles.commissionHeader}>
-            <Ionicons name="pie-chart-outline" size={18} color={colors.primary} />
-            <Text style={styles.commissionTitle}>نسبة العمولة</Text>
-          </View>
-          <View style={styles.commissionBody}>
-            <View style={styles.commissionItem}>
-              <Text style={styles.commissionLabel}>نسبة المنصة</Text>
-              <Text style={styles.commissionValue}>10%</Text>
+          {/* Commission Info */}
+          <View style={styles.commissionCard}>
+            <View style={styles.commissionHeader}>
+              <Ionicons name="pie-chart-outline" size={18} color={colors.primary} />
+              <Text style={styles.commissionTitle}>نظام العمولة</Text>
             </View>
-            <View style={styles.commissionItem}>
-              <Text style={styles.commissionLabel}>نصيبك من كل طلب</Text>
-              <Text style={[styles.commissionValue, { color: colors.success }]}>90%</Text>
-            </View>
-            <View style={[styles.commissionItem, { backgroundColor: '#FFF0E8', borderRadius: 8, padding: 8, marginTop: 4 }]}>
-              <Text style={styles.commissionLabel}>مثال: طلب بـ 100 جنيه</Text>
-              <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                <Text style={{ fontSize: 12, color: colors.success }}>تكسبي 90 ج</Text>
-                <Text style={{ fontSize: 12, color: colors.error }}>عمولة 10 ج</Text>
+            <View style={styles.commissionBody}>
+              <View style={styles.commissionItem}>
+                <Text style={styles.commissionLabel}>نسبة عمولة المنصة</Text>
+                <Text style={styles.commissionValue}>{profile?.commission_rate}%</Text>
+              </View>
+              <View style={styles.commissionItem}>
+                <Text style={styles.commissionLabel}>صافي أرباحك</Text>
+                <Text style={[styles.commissionValue, { color: colors.success }]}>{100 - (profile?.commission_rate || 0)}%</Text>
               </View>
             </View>
           </View>
-        </View>
 
-        {/* Recharge */}
-        <View style={styles.rechargeSection}>
-          <Text style={styles.sectionTitle}>شحن الرصيد</Text>
-          <Text style={styles.rechargeSubtitle}>اختاري طريقة الدفع المناسبة</Text>
+          {/* Withdrawal Section */}
+          <View style={styles.rechargeSection}>
+            <Text style={styles.sectionTitle}>طلب سحب أرباح</Text>
+            <Text style={styles.rechargeSubtitle}>سيتم تحويل المبلغ خلال 24 ساعة عمل</Text>
 
-          <View style={styles.paymentMethods}>
-            <View style={styles.paymentMethod}>
-              <Ionicons name="phone-portrait-outline" size={24} color={colors.primary} />
-              <Text style={styles.paymentName}>فودافون كاش</Text>
+            <View style={styles.paymentMethods}>
+              {['فودافون كاش', 'انستا باي', 'فوري'].map(method => (
+                <TouchableOpacity
+                  key={method}
+                  style={[styles.paymentMethod, paymentMethod === method && styles.paymentMethodActive]}
+                  onPress={() => setPaymentMethod(method)}
+                >
+                  <Ionicons
+                    name={method === 'فودافون كاش' ? 'phone-portrait-outline' : 'send-outline'}
+                    size={20}
+                    color={paymentMethod === method ? colors.white : colors.primary}
+                  />
+                  <Text style={[styles.paymentName, paymentMethod === method && { color: '#fff' }]}>{method}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-            <View style={styles.paymentMethod}>
-              <Ionicons name="card-outline" size={24} color={colors.primary} />
-              <Text style={styles.paymentName}>بطاقة بنكية</Text>
+
+            <View style={styles.withdrawForm}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.amountLabel}>المبلغ المراد سحبه</Text>
+                <TextInput
+                  style={styles.withdrawInput}
+                  value={requestedAmount}
+                  onChangeText={setRequestedAmount}
+                  keyboardType="numeric"
+                  placeholder="0.00"
+                  textAlign="right"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.amountLabel}>رقم التحويل / المعرف</Text>
+                <TextInput
+                  style={styles.withdrawInput}
+                  value={paymentPhone}
+                  onChangeText={setPaymentPhone}
+                  keyboardType="default"
+                  placeholder="رقم الهاتف أو المعرف"
+                  textAlign="right"
+                />
+              </View>
             </View>
-            <View style={styles.paymentMethod}>
-              <Ionicons name="storefront-outline" size={24} color={colors.primary} />
-              <Text style={styles.paymentName}>منافذ الدفع</Text>
-            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.rechargeBtn,
+                (submitting || (profile?.wallet_balance || 0) < minWithdrawal) && styles.rechargeBtnDisabled
+              ]}
+              onPress={handleWithdraw}
+              disabled={submitting || (profile?.wallet_balance || 0) < minWithdrawal}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="arrow-down-circle-outline" size={20} color={colors.white} />
+                  <Text style={styles.rechargeBtnText}>تأكيد طلب السحب</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {(profile?.wallet_balance || 0) < minWithdrawal && (
+              <Text style={styles.minWarning}>الرصيد غير كافٍ للسحب (الحد الأدنى {minWithdrawal} ج)</Text>
+            )}
           </View>
 
-          <Text style={styles.amountLabel}>اختاري المبلغ</Text>
-          <View style={styles.amountsRow}>
-            {rechargeAmounts.map(amount => (
-              <TouchableOpacity
-                key={amount}
-                style={[styles.amountChip, selectedAmount === amount && styles.amountChipActive]}
-                onPress={() => setSelectedAmount(amount)}
-              >
-                <Text style={[styles.amountText, selectedAmount === amount && styles.amountTextActive]}>
-                  {amount} ج
-                </Text>
-              </TouchableOpacity>
-            ))}
+          {/* Pending Withdrawals */}
+          {withdrawals.length > 0 && (
+            <View style={styles.historySection}>
+              <Text style={styles.sectionTitle}>طلبات سحب معلقة</Text>
+              {withdrawals.filter(w => w.status === 'pending').map(w => (
+                <View key={w.id} style={styles.transRow}>
+                  <View style={[styles.transIcon, { backgroundColor: '#FFF9C4' }]}>
+                    <Ionicons name="time-outline" size={18} color="#FBC02D" />
+                  </View>
+                  <View style={styles.transInfo}>
+                    <Text style={styles.transLabel}>طلب سحب ({w.payment_method.split(' ')[0]})</Text>
+                    <Text style={styles.transTime}>{new Date(w.created_at).toLocaleDateString('ar-EG')}</Text>
+                  </View>
+                  <Text style={[styles.transAmount, { color: '#FBC02D' }]}>{w.amount} ج</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Transaction History */}
+          <View style={styles.historySection}>
+            <Text style={styles.sectionTitle}>سجل المعاملات</Text>
+            {transactions.length === 0 ? (
+              <Text style={styles.emptyText}>لا توجد معاملات بعد</Text>
+            ) : (
+              transactions.map(tx => (
+                <TransactionRow
+                  key={tx.id}
+                  label={tx.description || (tx.type === 'credit' ? 'أرباح طلب' : 'سحب رصيد')}
+                  amount={tx.amount}
+                  time={tx.created_at}
+                  type={tx.type}
+                />
+              ))
+            )}
           </View>
 
-          <TouchableOpacity style={styles.rechargeBtn} onPress={handleRecharge}>
-            <Ionicons name="add-circle-outline" size={20} color={colors.white} />
-            <Text style={styles.rechargeBtnText}>
-              {selectedAmount ? `شحن ${selectedAmount} جنيه` : 'شحن الرصيد'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Transaction History */}
-        <View style={styles.historySection}>
-          <Text style={styles.sectionTitle}>سجل المعاملات</Text>
-          {transactions.map(tx => (
-            <TransactionRow key={tx.id} {...tx} />
-          ))}
-        </View>
-
-        <View style={{ height: 24 }} />
-      </ScrollView>
+          <View style={{ height: 24 }} />
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -232,19 +338,28 @@ const styles = StyleSheet.create({
   rechargeSubtitle: { fontSize: 12, color: colors.textLight, textAlign: 'right', marginBottom: 14 },
   paymentMethods: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   paymentMethod: {
-    flex: 1, backgroundColor: colors.background, borderRadius: 10, padding: 10,
+    flex: 1, backgroundColor: colors.background, borderRadius: 10, padding: 8,
     alignItems: 'center', gap: 4, borderWidth: 1.5, borderColor: colors.border,
   },
-  paymentName: { fontSize: 11, color: colors.text, textAlign: 'center', fontWeight: '500' },
-  amountLabel: { fontSize: 13, color: colors.text, textAlign: 'right', marginBottom: 8, fontWeight: '600' },
-  amountsRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  amountChip: {
-    flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
-    borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.white,
+  paymentMethodActive: {
+    backgroundColor: colors.primary, borderColor: colors.primary
   },
-  amountChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  amountText: { fontSize: 15, fontWeight: 'bold', color: colors.text },
-  amountTextActive: { color: colors.white },
+  paymentName: { fontSize: 10, color: colors.text, textAlign: 'center', fontWeight: '500' },
+  withdrawForm: { gap: 12, marginBottom: 16 },
+  inputGroup: { gap: 4 },
+  withdrawInput: {
+    backgroundColor: colors.background, borderRadius: 10, padding: 12,
+    borderWidth: 1, borderColor: colors.border, fontSize: 15
+  },
+  rechargeBtnDisabled: {
+    backgroundColor: colors.textLight,
+  },
+  minWarning: {
+    color: colors.error, fontSize: 11, textAlign: 'center', marginTop: 8
+  },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { textAlign: 'center', color: colors.textLight, paddingVertical: 20 },
+  amountLabel: { fontSize: 13, color: colors.text, textAlign: 'right', marginBottom: 4, fontWeight: '600' },
   rechargeBtn: {
     backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 13,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
