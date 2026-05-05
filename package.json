@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "update:preview": "eas update --channel preview --message"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -24,6 +25,7 @@
     "expo-linear-gradient": "~15.0.8",
     "expo-location": "~19.0.8",
     "expo-status-bar": "~3.0.9",
+    "expo-updates": "^55.0.21",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -36,6 +38,8 @@
   "private": true,
   "devDependencies": {
     "@expo/cli": "^55.0.24",
-    "dotenv": "^17.4.2"
+    "@types/react": "^19.2.14",
+    "dotenv": "^17.4.2",
+    "typescript": "^5.9.3"
   }
 }
