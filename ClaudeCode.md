@@ -1,5 +1,5 @@
 # Baiti App — Project Log
-_Last updated: 2026-05-04_
+_Last updated: 2026-05-05_
 
 ## Project Overview
 Baiti is a home-cook food delivery platform connecting home-based sellers with customers.
@@ -99,12 +99,22 @@ Stored in .env.local (never hardcoded)
 | 2026-05-05 | Performance optimization (useMemo, useCallback) | ✅ Done |
 | 2026-05-05 | Security audit — seller phone hidden from customers | ✅ Done |
 | 2026-05-05 | Final cleanup — mockData removed, console.logs cleaned | ✅ Done |
+| 2026-05-05 | Seller verification badge feature (blue checkmark #1D9BF0) | ✅ Done |
+| 2026-05-05 | Database migration for is_verified, verified_at, verified_by | ✅ Done |
+| 2026-05-05 | VerifiedBadge component created | ✅ Done |
+| 2026-05-05 | Badge displayed in all customer-facing seller name locations | ✅ Done |
+| 2026-05-05 | Admin can grant/revoke verification from seller details modal | ✅ Done |
+| 2026-05-05 | EAS Update configured for automatic OTA updates | ✅ Done |
+| 2026-05-05 | UPDATE_GUIDE.md created for future update instructions | ✅ Done |
+| 2026-05-05 | Expo Go preview setup and verified | ✅ Done |
 
 ## Pending Tasks
-- Push notifications for new orders (future enhancement)
+- Build Admin Dashboard as separate web page
+- APK build — ready when Expo free tier resets next month
+- Push notifications (future enhancement)
 - Image upload for products (future enhancement)
 - Multi-language support Arabic/English (future enhancement)
-- Remove test/seed data from Supabase Dashboard before launch
+- Remove test/seed data from Supabase before public launch
 
 ## Business Rules
 - Platform commission: 10% default (configurable per seller)
@@ -128,3 +138,7 @@ Stored in .env.local (never hardcoded)
 - **Seller Registration**: Implemented a 3-step registration flow including document upload to Supabase Storage.
 - **Routing**: Added logic in `AppNavigator` and `AppContext` to route sellers to `SellerPendingScreen` if their application is not yet approved.
 - **Notifications**: Added a health certificate expiry banner in the Seller Dashboard to alert users 30 days before expiration.
+- **Verification Badge**: Seller verification badge uses Twitter/X blue color #1D9BF0. Only admin can grant or revoke verification. `verified_at` and `verified_by` are recorded for audit trail.
+- **EAS Update**: Configured for automatic OTA updates. Channel: `preview`. Use for all code updates that don't change native modules.
+- **Update Strategy**: New APK only needed when adding new libraries or changing app configuration.
+- **Expo Go**: Used for immediate testing during development with `app.config.js` handling dynamic environment variables.

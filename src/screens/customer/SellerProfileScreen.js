@@ -9,6 +9,7 @@ import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
 import LoadingScreen from '../../components/LoadingScreen';
+import VerifiedBadge from '../../components/VerifiedBadge';
 
 function StarRow({ rating }) {
   return (
@@ -46,6 +47,7 @@ export default function SellerProfileScreen({ navigation, route }) {
         .from('seller_profiles')
         .select(`
           *,
+          is_verified,
           users (full_name, avatar_url),
           ratings (score)
         `)
@@ -168,7 +170,10 @@ export default function SellerProfileScreen({ navigation, route }) {
               <Ionicons name="person-circle-outline" size={40} color={colors.primary} />
             </View>
             <View style={styles.infoText}>
-              <Text style={styles.sellerName}>{seller.name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
+                <Text style={styles.sellerName}>{seller.name}</Text>
+                {seller.is_verified && <VerifiedBadge size={20} />}
+              </View>
               <Text style={styles.specialty}>{seller.specialty}</Text>
               <View style={styles.ratingRow}>
                 <StarRow rating={seller.rating} />

@@ -34,6 +34,7 @@ export default function CustomerHomeScreen({ navigation }) {
         .from('seller_profiles')
         .select(`
           *,
+          is_verified,
           users (full_name, avatar_url, region_id),
           products (id, name, price, category, is_available),
           ratings (score)
@@ -64,6 +65,7 @@ export default function CustomerHomeScreen({ navigation }) {
             distance: 0.8, // Placeholder
             priceRange: prices.length ? `${minPrice}-${maxPrice}` : '0',
             isOnline: s.is_available,
+            is_verified: s.is_verified,
             image: s.users?.avatar_url
           };
         });
