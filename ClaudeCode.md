@@ -99,6 +99,10 @@ Stored in .env.local (never hardcoded)
 | 2026-05-05 | Performance optimization (useMemo, useCallback) | ✅ Done |
 | 2026-05-05 | Security audit — seller phone hidden from customers | ✅ Done |
 | 2026-05-05 | Final cleanup — mockData removed, console.logs cleaned | ✅ Done |
+| 2026-05-05 | EAS Build configuration and preview profile set up | ✅ Done |
+| 2026-05-05 | Hardened User RLS (prevent role self-promotion) | ✅ Done |
+| 2026-05-05 | Implemented Storage RLS policies for all buckets | ✅ Done |
+| 2026-05-05 | Removed administrative secrets from build configuration | ✅ Done |
 
 ## Pending Tasks
 - Push notifications for new orders (future enhancement)
@@ -118,7 +122,7 @@ Stored in .env.local (never hardcoded)
 ## Notes & Decisions
 - **App Readiness**: The app is production-ready for initial launch with all mock data removed.
 - **Error Handling**: Error boundaries protect all user flows, and global loading/empty states provide consistent UX.
-- **Security**: Seller phone numbers are confirmed hidden from all customer-facing screens.
+- **Security**: Seller phone numbers are confirmed hidden from all customer-facing screens. Hardened database RLS to prevent users from changing their own roles or status. Implemented strict folder-level RLS for Supabase Storage.
 - **Special Requests**: Implemented a bidding system where customers post requests and sellers in the same region submit offers. Realtime is used to notify sellers of new requests and customers of new offers.
 - **Offer Acceptance**: Accepting an offer automatically closes the request, rejects all other offers, and creates a real order in the `orders` table.
 - **Seller Ratings**: Implemented dynamic average rating calculation from the `ratings` table, displayed on Home, Profile, and Offer cards.
