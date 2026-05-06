@@ -2,20 +2,20 @@ export default {
   expo: {
     name: "بيتي",
     slug: "baiti",
+    owner: "mostafa_15_93",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
     newArchEnabled: false,
+    /*
     updates: {
-      enabled: true,
-      checkAutomatically: "ON_LOAD",
-      fallbackToCacheTimeout: 0,
       url: "https://u.expo.dev/85c2594f-b539-42d4-900f-835a7d14ec4b"
     },
     runtimeVersion: {
       policy: "appVersion"
     },
+    */
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",

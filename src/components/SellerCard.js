@@ -50,10 +50,7 @@ export default function SellerCard({ seller, onPress }) {
       </View>
       <View style={styles.info}>
         <View style={styles.headerRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <Text style={styles.name}>{seller.kitchen_name || seller.name}</Text>
-            {seller.is_verified && <VerifiedBadge size={16} />}
-          </View>
+          <Text style={styles.name}>{seller.name}</Text>
           <View style={styles.ratingRow}>
             <View style={styles.stars}>{renderStars(seller.rating)}</View>
             <Text style={styles.ratingText}>{seller.rating}</Text>
@@ -137,11 +134,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   name: {
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.text,
-    flex: 1,
     textAlign: 'right',
   },
   ratingRow: {

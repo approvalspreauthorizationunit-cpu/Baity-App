@@ -2,11 +2,10 @@
 
 ## Steps:
 1. Install Expo Go from Google Play Store on your Android phone
-2. Make sure your phone and computer are on the same WiFi network
-   OR use tunnel mode (works on any network)
-3. In the project, run: `npx expo start --tunnel`
-4. Scan the QR code with your phone camera
-5. The app opens in Expo Go
+2. In the project, Jules runs: npx expo start --tunnel
+   (Or use the permanent link if available)
+3. Scan the QR code with your phone camera
+4. The app opens in Expo Go
 
 ## Note:
 Expo Go is for testing only.
