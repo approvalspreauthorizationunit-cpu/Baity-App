@@ -47,6 +47,7 @@ export default function SellerProfileScreen({ navigation, route }) {
         .from('seller_profiles')
         .select(`
           *,
+          is_verified,
           users (full_name, avatar_url),
           ratings (score)
         `)
@@ -148,10 +149,7 @@ export default function SellerProfileScreen({ navigation, route }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={styles.headerTitle}>{seller.name}</Text>
-          {seller.is_verified && <VerifiedBadge size={18} />}
-        </View>
+        <Text style={styles.headerTitle}>{seller.name}</Text>
         <View style={{ width: 40 }} />
       </View>
 
