@@ -50,6 +50,8 @@ Stored in .env.local (never hardcoded)
 ## Completed Tasks
 | Date | Task | Status |
 |------|------|--------|
+| 2026-05-05 | App published permanently to Expo preview channel | ✅ Done |
+| 2026-05-05 | Permanent QR code generated for testing | ✅ Done |
 | 2026-05-05 | Seller verification badge feature (blue checkmark #1D9BF0) | ✅ Done |
 | 2026-05-05 | Database migration for is_verified, verified_at, verified_by | ✅ Done |
 | 2026-05-05 | VerifiedBadge component created | ✅ Done |
@@ -103,3 +105,4 @@ Stored in .env.local (never hardcoded)
 - **Error Handling**: Error boundaries protect all user flows, and global loading/empty states provide consistent UX.
 - **Offer Acceptance**: Accepting an offer automatically closes the request, rejects all other offers, and creates a real order.
 - **Supabase Auth**: Implemented international phone number formatting (+20) for SMS OTP.
+- **Permanent Preview**: The app is published to the `preview` channel on Expo. Access via `exp://u.expo.dev/85c2594f-b539-42d4-900f-835a7d14ec4b?channel-name=preview`.

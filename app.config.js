@@ -1,7 +1,7 @@
 export default {
   expo: {
     name: "بيتي",
-    slug: "beiti",
+    slug: "baiti",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -11,7 +11,7 @@ export default {
       enabled: true,
       checkAutomatically: "ON_LOAD",
       fallbackToCacheTimeout: 0,
-      url: process.env.EXPO_PROJECT_ID ? `https://u.expo.dev/${process.env.EXPO_PROJECT_ID}` : undefined
+      url: "https://u.expo.dev/85c2594f-b539-42d4-900f-835a7d14ec4b"
     },
     runtimeVersion: {
       policy: "appVersion"
@@ -39,7 +39,7 @@ export default {
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
       eas: {
-        projectId: process.env.EXPO_PROJECT_ID || "anonymous"
+        projectId: "85c2594f-b539-42d4-900f-835a7d14ec4b"
       }
     }
   }
