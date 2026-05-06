@@ -1,0 +1,17 @@
+{
+  "build": {
+    "preview": {
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://xlkbosrabbioridklmdq.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsa2Jvc3JhYmJpb3JpZGtsbWRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3MTk4MDQsImV4cCI6MjA5MzI5NTgwNH0.Zw2lYCdvGkHxi-R4-rQZW05DZpfHacfDNNfn-7Xr-sg"
+      }
+    }
+  },
+  "cli": {
+    "appVersionSource": "remote"
+  }
+}

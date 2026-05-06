@@ -1,5 +1,5 @@
 # Baiti App — Project Log
-_Last updated: 2026-05-05_
+_Last updated: 2026-05-06_
 
 ## Project Overview
 Baiti is a home-cook food delivery platform connecting home-based sellers with customers.
@@ -50,8 +50,8 @@ Stored in .env.local (never hardcoded)
 ## Completed Tasks
 | Date | Task | Status |
 |------|------|--------|
-| 2026-05-05 | App published permanently to Expo Go (Classic link) | ✅ Done |
-| 2026-05-05 | Permanent QR code generated for Expo Go | ✅ Done |
+| 2026-05-06 | Fixed "Failed to download remote update" by replacing 0-byte assets | ✅ Done |
+| 2026-05-06 | App published permanently to Expo Go (default channel) | ✅ Done |
 | 2026-05-05 | Seller verification badge feature (blue checkmark #1D9BF0) | ✅ Done |
 | 2026-05-05 | Database migration for is_verified, verified_at, verified_by | ✅ Done |
 | 2026-05-05 | VerifiedBadge component created | ✅ Done |
@@ -99,9 +99,10 @@ Stored in .env.local (never hardcoded)
 
 ## Notes & Decisions
 - **Verification Badge**: Uses Twitter/X blue color #1D9BF0. Only admin can grant or revoke verification. verified_at and verified_by recorded for audit trail.
-- **EAS Update**: Channel set to 'preview'. Use this for all code updates. New APK only needed when adding new libraries or changing app config.
+- **EAS Update**: Channel set to 'default' (mapped to Classic Expo Go links). Use this for all code updates. New APK only needed when adding new libraries or changing app config.
 - **Expo Go**: Permanent Classic link `exp://exp.host/@mostafa_15_93/baiti`. QR code: `https://qr.expo.dev/expo-go?owner=mostafa_15_93&slug=baiti`.
 - **App Readiness**: The app is production-ready for initial launch with all mock data removed.
 - **Error Handling**: Error boundaries protect all user flows, and global loading/empty states provide consistent UX.
 - **Offer Acceptance**: Accepting an offer automatically closes the request, rejects all other offers, and creates a real order.
 - **Supabase Auth**: Implemented international phone number formatting (+20) for SMS OTP.
+- **Asset Fix**: Replaced 0-byte placeholder assets with valid PNG files to fix "Failed to download remote update" errors in mobile Expo Go.
