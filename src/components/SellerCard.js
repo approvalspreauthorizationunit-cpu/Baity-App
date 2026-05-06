@@ -50,7 +50,10 @@ export default function SellerCard({ seller, onPress }) {
       </View>
       <View style={styles.info}>
         <View style={styles.headerRow}>
-          <Text style={styles.name}>{seller.name}</Text>
+          <View style={styles.nameContainer}>
+            <Text style={styles.name}>{seller.name}</Text>
+            {seller.is_verified && <VerifiedBadge size={16} />}
+          </View>
           <View style={styles.ratingRow}>
             <View style={styles.stars}>{renderStars(seller.rating)}</View>
             <Text style={styles.ratingText}>{seller.rating}</Text>
