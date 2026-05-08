@@ -59,7 +59,7 @@ export default function SplashScreen({ navigation }) {
 
         <TouchableOpacity
           style={styles.startButton}
-          onPress={() => navigation.navigate('Phone')}
+          onPress={() => navigation.navigate('GuestRoot')}
           activeOpacity={0.85}
         >
           <Text style={styles.startButtonText}>ابدأ الآن</Text>

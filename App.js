@@ -32,6 +32,7 @@ import OrderTrackingScreen from './src/screens/customer/OrderTrackingScreen';
 import OrderHistoryScreen from './src/screens/customer/OrderHistoryScreen';
 import CustomerProfileScreen from './src/screens/customer/CustomerProfileScreen';
 import SpecialRequestsScreen from './src/screens/customer/SpecialRequestsScreen';
+import GuestSettingsScreen from './src/screens/guest/GuestSettingsScreen';
 
 // Seller Screens
 import SellerDashboardScreen from './src/screens/seller/SellerDashboardScreen';
@@ -57,8 +58,8 @@ const tabBarStyle = {
   ...(Platform.OS === 'web' ? { flexDirection: 'row-reverse' } : {}),
 };
 
-// ─── Customer Tab Navigator ───────────────────────────────────────────────────
-function CustomerTabs() {
+// ─── Guest/Customer Tab Navigator ──────────────────────────────────────────────
+function CustomerTabs({ isGuest = false }) {
   const { getCartCount } = useApp();
   const cartCount = getCartCount();
 
@@ -77,14 +78,15 @@ function CustomerTabs() {
             'طلباتي':   focused ? 'receipt' : 'receipt-outline',
             'السلة':    focused ? 'cart' : 'cart-outline',
             'حسابي':    focused ? 'person' : 'person-outline',
+            'الإعدادات': focused ? 'settings' : 'settings-outline',
           };
           return <Ionicons name={icons[route.name]} size={size} color={color} />;
         },
       })}
     >
       <Tab.Screen name="الرئيسية" component={CustomerHomeStack} />
-      <Tab.Screen name="طلب خاص" component={SpecialRequestsScreen} />
-      <Tab.Screen name="طلباتي"   component={OrderHistoryScreen} />
+      {!isGuest && <Tab.Screen name="طلب خاص" component={SpecialRequestsScreen} />}
+      {!isGuest && <Tab.Screen name="طلباتي"   component={OrderHistoryScreen} />}
       <Tab.Screen
         name="السلة"
         component={CartScreen}
@@ -93,7 +95,11 @@ function CustomerTabs() {
           tabBarBadgeStyle: { backgroundColor: colors.primary, fontSize: 10 },
         }}
       />
-      <Tab.Screen name="حسابي" component={CustomerProfileScreen} />
+      {isGuest ? (
+        <Tab.Screen name="الإعدادات" component={GuestSettingsScreen} />
+      ) : (
+        <Tab.Screen name="حسابي" component={CustomerProfileScreen} />
+      )}
     </Tab.Navigator>
   );
 }
@@ -104,6 +110,23 @@ function CustomerHomeStack() {
       <Stack.Screen name="CustomerHome"  component={CustomerHomeScreen} />
       <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
       <Stack.Screen name="Checkout"      component={CheckoutScreen} />
+      <Stack.Screen name="GuestSettings" component={GuestSettingsScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// GuestRoot: Limited access
+function GuestRoot() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="GuestTabs">
+        {(props) => <CustomerTabs {...props} isGuest={true} />}
+      </Stack.Screen>
+      <Stack.Screen name="Phone" component={PhoneScreen} />
+      <Stack.Screen name="OTP" component={OTPScreen} />
+      <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} />
+      <Stack.Screen name="AdminLogin" component={AdminLoginScreen} />
+      <Stack.Screen name="SellerRegistration" component={SellerRegistrationScreen} />
     </Stack.Navigator>
   );
 }
@@ -178,13 +201,8 @@ function AppNavigator() {
   if (!isLoggedIn) {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Splash"             component={SplashScreen} />
-        <Stack.Screen name="Phone"              component={PhoneScreen} />
-        <Stack.Screen name="OTP"                component={OTPScreen} />
-        <Stack.Screen name="RoleSelection"      component={RoleSelectionScreen} />
-        <Stack.Screen name="SellerRegistration" component={SellerRegistrationScreen} />
-        <Stack.Screen name="AdminLogin"         component={AdminLoginScreen} />
-        <Stack.Screen name="AdminDashboard"     component={AdminDashboardScreen} />
+        <Stack.Screen name="Splash"    component={SplashScreen} />
+        <Stack.Screen name="GuestRoot" component={GuestRoot} />
       </Stack.Navigator>
     );
   }

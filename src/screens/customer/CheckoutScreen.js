@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import { Modal } from 'react-native';
 
 const timeSlots = [
   'في أقرب وقت ممكن', 'بعد 30 دقيقة', 'بعد ساعة', 'بعد ساعتين',
@@ -16,12 +17,13 @@ const timeSlots = [
 
 export default function CheckoutScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { cart, user, clearCart, getCartTotal } = useApp();
+  const { cart, user, isLoggedIn, clearCart, getCartTotal } = useApp();
   const [selectedAddress, setSelectedAddress] = useState(user?.addresses?.[0] || null);
   const [notes, setNotes] = useState('');
   const [selectedTime, setSelectedTime] = useState(timeSlots[0]);
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(true);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [totals, setTotals] = useState({
     subtotal: getCartTotal(),
     delivery_fee: 0,
@@ -42,7 +44,7 @@ export default function CheckoutScreen({ navigation }) {
         {
           body: {
             seller_id: cart.sellerId,
-            region_id: user.region_id,
+            region_id: user?.region_id || null,
             subtotal: getCartTotal()
           }
         }
@@ -59,6 +61,11 @@ export default function CheckoutScreen({ navigation }) {
   };
 
   const handlePlaceOrder = async () => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+    }
+
     if (!selectedAddress) {
       Alert.alert('تنبيه', 'برجاء اختيار عنوان التوصيل');
       return;
@@ -270,12 +277,50 @@ export default function CheckoutScreen({ navigation }) {
             <Text style={styles.orderBtnText}>جاري تأكيد الطلب...</Text>
           ) : (
             <>
-              <Text style={styles.orderBtnText}>تأكيد الطلب</Text>
+              <Text style={styles.orderBtnText}>{isLoggedIn ? 'تأكيد الطلب' : 'سجل دخولك لإتمام الطلب'}</Text>
               <Text style={styles.orderBtnTotal}>{finalGrandTotal} جنيه</Text>
             </>
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Login Prompt Modal */}
+      <Modal visible={showLoginModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.loginModalBox}>
+            <Ionicons name="lock-closed-outline" size={48} color={colors.primary} />
+            <Text style={styles.loginModalTitle}>سجّل دخولك لإتمام الطلب</Text>
+            <Text style={styles.loginModalDesc}>يجب تسجيل الدخول لتتمكني من تحديد عنوان التوصيل وتأكيد طلبك</Text>
+
+            <TouchableOpacity
+              style={styles.loginBtn}
+              onPress={() => {
+                setShowLoginModal(false);
+                navigation.navigate('Phone');
+              }}
+            >
+              <Text style={styles.loginBtnText}>تسجيل الدخول</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.registerBtn}
+              onPress={() => {
+                setShowLoginModal(false);
+                navigation.navigate('Phone');
+              }}
+            >
+              <Text style={styles.registerBtnText}>إنشاء حساب جديد</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={() => setShowLoginModal(false)}
+            >
+              <Text style={styles.closeBtnText}>إلغاء</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -345,6 +390,26 @@ const styles = StyleSheet.create({
   totalRow: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 6, paddingTop: 10 },
   totalLabel: { fontSize: 16, fontWeight: 'bold', color: colors.text },
   totalValue: { fontSize: 18, fontWeight: 'bold', color: colors.primary },
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24
+  },
+  loginModalBox: {
+    backgroundColor: '#fff', borderRadius: 24, padding: 24, width: '100%', alignItems: 'center'
+  },
+  loginModalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginVertical: 12 },
+  loginModalDesc: { fontSize: 14, color: colors.textLight, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
+  loginBtn: {
+    backgroundColor: colors.primary, width: '100%', borderRadius: 14, paddingVertical: 14,
+    alignItems: 'center', marginBottom: 12
+  },
+  loginBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  registerBtn: {
+    borderWidth: 1.5, borderColor: colors.primary, width: '100%', borderRadius: 14, paddingVertical: 14,
+    alignItems: 'center', marginBottom: 12
+  },
+  registerBtnText: { color: colors.primary, fontSize: 16, fontWeight: 'bold' },
+  closeBtn: { padding: 8 },
+  closeBtnText: { color: colors.textLight, fontSize: 14 },
   footer: {
     backgroundColor: colors.white, paddingHorizontal: 16, paddingTop: 12,
     borderTopWidth: 1, borderTopColor: colors.border,
