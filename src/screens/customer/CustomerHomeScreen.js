@@ -134,6 +134,12 @@ export default function CustomerHomeScreen({ navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
+          <TouchableOpacity
+            style={styles.settingsBtn}
+            onPress={() => navigation.navigate('GuestSettings')}
+          >
+            <Ionicons name="settings-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
           <View style={styles.onlineBadge}>
             <View style={styles.onlineDot} />
             <Text style={styles.onlineCount}>{onlineSellers} متاحة الآن</Text>
@@ -285,8 +291,23 @@ const styles = StyleSheet.create({
     maxWidth: 150,
   },
   headerLeft: {
-    justifyContent: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingTop: 6,
+  },
+  settingsBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   onlineBadge: {
     flexDirection: 'row',

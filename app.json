@@ -25,6 +25,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "85c2594f-b539-42d4-900f-835a7d14ec4b"
+      }
+    },
+    "owner": "mostafa1593s-organization"
   }
 }

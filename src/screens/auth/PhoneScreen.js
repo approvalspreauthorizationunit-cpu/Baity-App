@@ -111,12 +111,6 @@ export default function PhoneScreen({ navigation }) {
           <Text style={styles.link}>سياسة الخصوصية</Text>
         </Text>
 
-        <TouchableOpacity
-          style={styles.adminLink}
-          onPress={() => navigation.navigate('AdminLogin')}
-        >
-          <Text style={styles.adminLinkText}>دخول المشرف</Text>
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -23,7 +23,9 @@ async function seed() {
   const regions = [
     { name: 'المعادي', country: 'Egypt', is_active: true, delivery_fee: 15 },
     { name: 'مدينة نصر', country: 'Egypt', is_active: true, delivery_fee: 15 },
-    { name: 'الزمالك', country: 'Egypt', is_active: true, delivery_fee: 20 }
+    { name: 'الزمالك', country: 'Egypt', is_active: true, delivery_fee: 20 },
+    { name: 'المنصورة - وسط البلد', country: 'Egypt', is_active: true, delivery_fee: 10 },
+    { name: 'دمياط - الجديدة', country: 'Egypt', is_active: true, delivery_fee: 12 }
   ];
 
   const { data: seededRegions, error: regionsError } = await supabase
@@ -85,8 +87,42 @@ async function seed() {
         { name: 'كيك الشوكولاتة', price: 120, category: 'حلويات', is_available: true },
         { name: 'أم علي', price: 60, category: 'حلويات', is_available: true }
       ]
+    },
+    {
+      email: 'seller4@test.com',
+      password: 'Test1234!',
+      full_name: 'أم كريم',
+      phone: '+201444444444',
+      kitchen_name: 'مطبخ أم كريم',
+      bio: 'متخصصة في الأكلات المنصورية الأصيلة',
+      region: 'المنصورة - وسط البلد',
+      is_verified: true,
+      working_hours: '9:00 ص - 8:00 م',
+      products: [
+        { name: 'فسيخ وملوحة', price: 45, category: 'أكل بيتي', is_available: true },
+        { name: 'طاجن باذنجان باللحمة', price: 80, category: 'أكل بيتي', is_available: true },
+        { name: 'رز بالشعرية والكبد', price: 55, category: 'أكل بيتي', is_available: true }
+      ]
+    },
+    {
+      email: 'seller5@test.com',
+      password: 'Test1234!',
+      full_name: 'شيف هدى',
+      phone: '+201555555556',
+      kitchen_name: 'مطبخ هدى الدمياطي',
+      bio: 'أشهى الأكلات الدمياطية التقليدية',
+      region: 'دمياط - الجديدة',
+      is_verified: false,
+      working_hours: '10:00 ص - 9:00 م',
+      products: [
+        { name: 'جبنة دمياطي طازجة', price: 35, category: 'منتجات', is_available: true },
+        { name: 'بط محشي', price: 150, category: 'مشويات', is_available: true },
+        { name: 'فتة جمبري', price: 120, category: 'أكل بيتي', is_available: true }
+      ]
     }
   ];
+
+  const sellerProfiles = [];
 
   for (const s of sellersData) {
     console.log(`Processing seller: ${s.full_name}`);
@@ -132,13 +168,16 @@ async function seed() {
       commission_rate: 10,
       region_id: getRegionId(s.region),
       wallet_balance: 0,
-      working_hours: s.working_hours || '9:00 ص - 9:00 م'
+      working_hours: s.working_hours || '9:00 ص - 9:00 م',
+      is_verified: s.is_verified || false
     }).select().single();
 
     if (profileError) {
       console.error(`Error creating seller profile for ${s.kitchen_name}:`, profileError.message);
       continue;
     }
+
+    sellerProfiles.push(profile);
 
     // Seed Products
     const products = s.products.map(p => ({ ...p, seller_id: profile.id }));
@@ -150,7 +189,7 @@ async function seed() {
 
   // 3. Seed Test Customer
   console.log('Processing test customer...');
-  const customer = {
+  const customerData = {
     email: 'customer1@test.com',
     password: 'Test1234!',
     full_name: 'أحمد محمد',
@@ -159,10 +198,10 @@ async function seed() {
   };
 
   const { data: authCust, error: authCustError } = await supabase.auth.admin.createUser({
-    email: customer.email,
-    password: customer.password,
+    email: customerData.email,
+    password: customerData.password,
     email_confirm: true,
-    phone: customer.phone,
+    phone: customerData.phone,
     phone_confirm: true
   });
 
@@ -170,7 +209,7 @@ async function seed() {
   if (authCustError) {
     if (authCustError.message.includes('already registered')) {
       const { data: users } = await supabase.auth.admin.listUsers();
-      custId = users.users.find(u => u.email === customer.email).id;
+      custId = users.users.find(u => u.email === customerData.email).id;
     } else {
       console.error('Error creating auth customer:', authCustError.message);
     }
@@ -181,117 +220,130 @@ async function seed() {
   if (custId) {
     await supabase.from('users').upsert({
       id: custId,
-      full_name: customer.full_name,
-      phone: customer.phone,
+      full_name: customerData.full_name,
+      phone: customerData.phone,
       role: 'customer',
-      region_id: getRegionId(customer.region),
+      region_id: getRegionId(customerData.region),
       is_active: true
     });
     console.log('Customer seeded.');
   }
 
-  // 4. Seed Pending Seller
-  console.log('Processing test pending seller...');
-  const pendingSeller = {
-    email: 'pending_seller@test.com',
-    password: 'Test1234!',
-    full_name: 'سارة خالد',
-    phone: '+201555555555',
-    kitchen_name: 'مطبخ سارة',
-    region: 'المعادي'
-  };
+  // 4. Seed Test Orders
+  console.log('Seeding test orders...');
+  const seller1 = sellerProfiles.find(p => p.kitchen_name === 'مطبخ أم أحمد');
+  const seller2 = sellerProfiles.find(p => p.kitchen_name === 'مطبخ أم علي');
+  const seller4 = sellerProfiles.find(p => p.kitchen_name === 'مطبخ أم كريم');
 
-  const { data: authPending, error: authPendingError } = await supabase.auth.admin.createUser({
-    email: pendingSeller.email,
-    password: pendingSeller.password,
-    email_confirm: true,
-    phone: pendingSeller.phone,
-    phone_confirm: true
-  });
+  if (custId && seller1 && seller2 && seller4) {
+    const orders = [
+      {
+        customer_id: custId,
+        seller_id: seller1.id,
+        status: 'delivered',
+        total_amount: 155,
+        seller_earnings: 139.5,
+        delivery_fee: 15,
+        commission_amount: 15.5,
+        delivery_address: 'المعادي، شارع 9',
+        created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        customer_id: custId,
+        seller_id: seller2.id,
+        status: 'preparing',
+        total_amount: 195,
+        seller_earnings: 175.5,
+        delivery_fee: 15,
+        commission_amount: 19.5,
+        delivery_address: 'المعادي، شارع 9',
+        created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        customer_id: custId,
+        seller_id: seller4.id,
+        status: 'pending',
+        total_amount: 80,
+        seller_earnings: 72,
+        delivery_fee: 10,
+        commission_amount: 8,
+        delivery_address: 'المعادي، شارع 9',
+        created_at: new Date().toISOString()
+      }
+    ];
 
-  let pendingId;
-  if (authPendingError) {
-    if (authPendingError.message.includes('already registered')) {
-      const { data: users } = await supabase.auth.admin.listUsers();
-      pendingId = users.users.find(u => u.email === pendingSeller.email).id;
-    } else {
-      console.error('Error creating auth pending seller:', authPendingError.message);
+    for (const o of orders) {
+      const { data: newOrder, error: orderError } = await supabase.from('orders').upsert(o, { onConflict: 'customer_id,seller_id,created_at' }).select().single();
+      if (orderError) {
+        console.error('Error seeding order:', orderError.message);
+        continue;
+      }
+
+      // Add order items for simulation
+      if (o.status === 'delivered') {
+          // Order 1 items: كشري بيتي x2, ملوخية x1
+          const { data: p1 } = await supabase.from('products').select('id').eq('name', 'كشري بيتي').eq('seller_id', seller1.id).single();
+          const { data: p2 } = await supabase.from('products').select('id').eq('name', 'ملوخية بالأرانب').eq('seller_id', seller1.id).single();
+          if (p1 && p2) {
+              await supabase.from('order_items').upsert([
+                  { order_id: newOrder.id, product_id: p1.id, quantity: 2, unit_price: 35 },
+                  { order_id: newOrder.id, product_id: p2.id, quantity: 1, unit_price: 85 }
+              ], { onConflict: 'order_id,product_id' });
+          }
+
+          // Add rating for Order 1
+          await supabase.from('ratings').upsert({
+              order_id: newOrder.id,
+              customer_id: custId,
+              seller_id: seller1.id,
+              score: 5,
+              comment: 'أكل رائع وتوصيل سريع'
+          }, { onConflict: 'order_id' });
+      } else if (o.status === 'preparing') {
+          // Order 2 items: كباب مشوي x1, أرز بخاري x1
+          const { data: p1 } = await supabase.from('products').select('id').eq('name', 'كباب مشوي').eq('seller_id', seller2.id).single();
+          const { data: p2 } = await supabase.from('products').select('id').eq('name', 'أرز بخاري').eq('seller_id', seller2.id).single();
+          if (p1 && p2) {
+              await supabase.from('order_items').upsert([
+                  { order_id: newOrder.id, product_id: p1.id, quantity: 1, unit_price: 110 },
+                  { order_id: newOrder.id, product_id: p2.id, quantity: 1, unit_price: 70 }
+              ], { onConflict: 'order_id,product_id' });
+          }
+
+          // Add second test rating (Previous order)
+          await supabase.from('ratings').upsert({
+              customer_id: custId,
+              seller_id: seller2.id,
+              score: 4,
+              comment: 'كويس جداً'
+          }, { onConflict: 'customer_id,seller_id' });
+      } else if (o.status === 'pending') {
+          const { data: p1 } = await supabase.from('products').select('id').eq('name', 'طاجن باذنجان باللحمة').eq('seller_id', seller4.id).single();
+          if (p1) {
+              await supabase.from('order_items').upsert([
+                  { order_id: newOrder.id, product_id: p1.id, quantity: 1, unit_price: 80 }
+              ], { onConflict: 'order_id,product_id' });
+          }
+      }
     }
-  } else {
-    pendingId = authPending.user.id;
   }
 
-  if (pendingId) {
-    await supabase.from('users').upsert({
-      id: pendingId,
-      full_name: pendingSeller.full_name,
-      phone: pendingSeller.phone,
-      role: 'seller',
-      region_id: getRegionId(pendingSeller.region),
-      is_active: true
-    });
-
-    await supabase.from('seller_profiles').upsert({
-      user_id: pendingId,
-      kitchen_name: pendingSeller.kitchen_name,
-      status: 'pending',
-      region_id: getRegionId(pendingSeller.region)
-    });
-    console.log('Pending seller seeded.');
-  }
-
-  // 5. Seed Special Request & Offer
-  console.log('Seeding special request and offer...');
-  const { data: customerUser } = await supabase.from('users').select('id, region_id').eq('phone', '+201012345678').single();
-  const { data: seller1Profile } = await supabase.from('seller_profiles').select('id').eq('kitchen_name', 'مطبخ أم أحمد').single();
-
-  if (customerUser && seller1Profile) {
-    // Check if request already exists
-    let { data: request } = await supabase
-        .from('special_requests')
-        .select('id')
-        .eq('customer_id', customerUser.id)
-        .eq('description', 'عزومة عيد ميلاد 15 شخص')
-        .single();
-
-    if (!request) {
-        const { data: newReq, error: reqError } = await supabase.from('special_requests').insert({
-            customer_id: customerUser.id,
-            region_id: customerUser.region_id,
-            description: 'عزومة عيد ميلاد 15 شخص',
-            requested_items: [
-                { name: 'كشري', quantity: 15 },
-                { name: 'سلطة خضراء', quantity: 5 }
-            ],
-            delivery_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            status: 'open'
-        }).select().single();
-
-        if (reqError) console.error('Error seeding request:', reqError.message);
-        request = newReq;
-    }
-
-    if (request) {
-        // Check if offer exists
-        const { data: offer } = await supabase
-            .from('special_request_offers')
-            .select('id')
-            .eq('request_id', request.id)
-            .eq('seller_id', seller1Profile.id)
-            .single();
-
-        if (!offer) {
-            const { error: offerError } = await supabase.from('special_request_offers').insert({
-                request_id: request.id,
-                seller_id: seller1Profile.id,
-                price: 450,
-                notes: 'يشمل التوصيل والأطباق',
-                status: 'pending'
-            });
-
-            if (offerError) console.error('Error seeding offer:', offerError.message);
-        }
-    }
+  // 5. Seed Special Request
+  console.log('Seeding special request...');
+  if (custId) {
+    const regionId = getRegionId('المنصورة - وسط البلد');
+    await supabase.from('special_requests').upsert({
+        customer_id: custId,
+        region_id: regionId,
+        description: 'عزومة فرح 30 شخص - محتاج كشري ومحشي وسلطة',
+        requested_items: [
+            { name: 'كشري', quantity: 30 },
+            { name: 'محشي', quantity: 10 },
+            { name: 'سلطة', quantity: 10 }
+        ],
+        delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: 'open'
+    }, { onConflict: 'customer_id,description' });
   }
 
   console.log('--- Seeding Complete ---');
